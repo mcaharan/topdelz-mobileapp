@@ -20,7 +20,7 @@ import {
   View,
 } from 'react-native';
 import * as Location from 'expo-location';
-import { getHomeData, getProfile, updateProfile } from '../services/api';
+import { addToWishlist, getHomeData, getProfile, getWishlist, getWishlistHistory, removeFromWishlist, updateProfile } from '../services/api';
 
 const { width, height } = Dimensions.get('window');
 const haptic = () => Vibration.vibrate(8);
@@ -28,6 +28,22 @@ const haptic = () => Vibration.vibrate(8);
 const shareItem = (title, message) => {
   haptic();
   Share.share({ title, message });
+};
+
+const timeAgo = (value) => {
+  if (!value) return 'just now';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'just now';
+
+  const diffMs = Date.now() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 7) return `${diffDay}d ago`;
+  return date.toLocaleDateString();
 };
 
 /* ─── Theme ─────────────────────────────────────────────── */
@@ -309,9 +325,13 @@ function BannerSlider({ banners = BANNERS }) {
               <Text style={styles.heroFine}>*Valid on orders above ₹200</Text>
             </View>
             <View style={styles.heroEmojisCol}>
-              {(b.emojis || []).map((e, i) => (
-                <Text key={i} style={{ fontSize: i === 0 ? 42 : 34 }}>{e}</Text>
-              ))}
+              {b.image_url ? (
+                <Image source={{ uri: b.image_url }} style={styles.heroImage} resizeMode="cover" />
+              ) : (
+                (b.emojis || []).map((e, i) => (
+                  <Text key={i} style={{ fontSize: i === 0 ? 42 : 34 }}>{e}</Text>
+                ))
+              )}
             </View>
           </LinearGradient>
         ))}
@@ -326,10 +346,17 @@ function BannerSlider({ banners = BANNERS }) {
   );
 }
 
-function FlashDealCard({ item, countdown }) {
+function FlashDealCard({ item, countdown, isSaved, onToggleWishlist }) {
   return (
     <LinearGradient colors={item.bg} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.flashCard}>
-      <Text style={styles.flashEmoji}>{item.emoji}</Text>
+      <Pressable style={styles.quickSaveBtn} onPress={() => onToggleWishlist?.('flash_deal', item)}>
+        <Text style={styles.quickSaveText}>{isSaved ? '♥' : '♡'}</Text>
+      </Pressable>
+      {item.image_url ? (
+        <Image source={{ uri: item.image_url }} style={styles.flashImage} resizeMode="cover" />
+      ) : (
+        <Text style={styles.flashEmoji}>{item.emoji}</Text>
+      )}
       <Text style={styles.flashOff}>{item.off} OFF</Text>
       <Text style={styles.flashName}>{item.name}</Text>
       <View style={styles.flashTimerRow}>
@@ -370,10 +397,17 @@ function SpecialOfferStrip() {
   );
 }
 
-function DealCard({ deal }) {
+function DealCard({ deal, isSaved, onToggleWishlist }) {
   return (
     <LinearGradient colors={deal.color} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.dealCard}>
-      <Text style={styles.dealEmoji}>{deal.emoji}</Text>
+      <Pressable style={styles.quickSaveBtn} onPress={() => onToggleWishlist?.('deal_card', deal)}>
+        <Text style={styles.quickSaveText}>{isSaved ? '♥' : '♡'}</Text>
+      </Pressable>
+      {deal.image_url ? (
+        <Image source={{ uri: deal.image_url }} style={styles.dealImage} resizeMode="cover" />
+      ) : (
+        <Text style={styles.dealEmoji}>{deal.emoji}</Text>
+      )}
       <Text style={styles.dealSubLabel}>A guide to</Text>
       <Text style={styles.dealTitle}>{deal.title}</Text>
       <Text style={styles.dealDesc}>{deal.desc}</Text>
@@ -395,11 +429,14 @@ function DealCard({ deal }) {
   );
 }
 
-function PopularCard({ store, onPress }) {
+function PopularCard({ store, onPress, isSaved, onToggleWishlist }) {
   const { colors } = useContext(ThemeContext);
   return (
     <Pressable style={[styles.popularCard, { backgroundColor: colors.card }]} onPress={onPress}>
       <View style={[styles.popularImgBox, { backgroundColor: store.bg }]}>
+        <Pressable style={styles.quickSaveBtnSmall} onPress={() => onToggleWishlist?.('store', store)}>
+          <Text style={styles.quickSaveTextSmall}>{isSaved ? '♥' : '♡'}</Text>
+        </Pressable>
         <Text style={styles.popularEmoji}>{store.emoji}</Text>
         {!store.open && (
           <View style={styles.closedOverlay}><Text style={styles.closedText}>Closed</Text></View>
@@ -423,11 +460,14 @@ function PopularCard({ store, onPress }) {
   );
 }
 
-function NearbyCard({ store, onPress }) {
+function NearbyCard({ store, onPress, isSaved, onToggleWishlist }) {
   const { colors } = useContext(ThemeContext);
   return (
     <Pressable style={[styles.nearbyCard, { backgroundColor: colors.card }]} onPress={onPress}>
       <View style={[styles.nearbyImgBox, { backgroundColor: store.bg }]}>
+        <Pressable style={styles.quickSaveBtnSmall} onPress={() => onToggleWishlist?.('store', store)}>
+          <Text style={styles.quickSaveTextSmall}>{isSaved ? '♥' : '♡'}</Text>
+        </Pressable>
         <Text style={styles.nearbyEmoji}>{store.emoji}</Text>
         {!store.open && (
           <View style={styles.nearbyClosedBadge}>
@@ -697,14 +737,13 @@ const W_FILTERS = [
   { id: 'deal', label: '🎟️ Deals' },
 ];
 
-function WishlistView() {
+function WishlistView({ items = WISHLIST_ITEMS, history = [], onRemove }) {
   const { colors } = useContext(ThemeContext);
-  const [items, setItems] = useState(WISHLIST_ITEMS);
   const [filter, setFilter] = useState('all');
 
   const removeItem = (id) => {
     haptic();
-    setItems((prev) => prev.filter((i) => i.id !== id));
+    onRemove?.(id);
   };
 
   const filtered = filter === 'all' ? items : items.filter((i) => i.category === filter);
@@ -792,7 +831,11 @@ function WishlistView() {
                 end={{ x: 1, y: 1 }}
                 style={styles.wishlistCardBg}
               >
-                <Text style={{ fontSize: 38 }}>{item.emoji}</Text>
+                {item.image_url ? (
+                  <Image source={{ uri: item.image_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                ) : (
+                  <Text style={{ fontSize: 38 }}>{item.emoji}</Text>
+                )}
                 {/* Discount ribbon */}
                 <View style={styles.wishlistRibbon}>
                   <Text style={styles.wishlistRibbonText}>{item.off}</Text>
@@ -846,6 +889,23 @@ function WishlistView() {
             </View>
             <Text style={{ fontSize: 44 }}>🎁</Text>
           </LinearGradient>
+
+          {history.length > 0 ? (
+            <View style={[styles.wishlistHistoryCard, { backgroundColor: colors.card }]}> 
+              <Text style={[styles.wishlistHistoryTitle, { color: colors.text }]}>Recent Wishlist Activity</Text>
+              {history.slice(0, 8).map((entry) => (
+                <View key={entry.id} style={styles.wishlistHistoryRow}>
+                  <Text style={styles.wishlistHistoryEmoji}>{entry.item?.emoji || '🕘'}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.wishlistHistoryText, { color: colors.text }]} numberOfLines={1}>
+                      {entry.action === 'added' ? 'Saved' : entry.action === 'removed' ? 'Removed' : 'Viewed'} {entry.item?.title || 'item'}
+                    </Text>
+                    <Text style={styles.wishlistHistorySub}>{timeAgo(entry.created_at)}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </ScrollView>
       )}
     </View>
@@ -1565,11 +1625,85 @@ export default function HomeScreen({ onLogout }) {
   const [nearbyStores, setNearbyStores]   = useState(NEARBY_STORES);
   const [interestMatchedStores, setInterestMatchedStores] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [wishlistItems, setWishlistItems] = useState([]);
+  const [wishlistHistory, setWishlistHistory] = useState([]);
+  const [wishlistMap, setWishlistMap] = useState({});
+
+  const normalizeWishlistItems = useCallback((rows = []) => {
+    return rows.map((row) => {
+      const item = row.item || {};
+      const id = `${row.item_type}:${row.item_id}`;
+      const category = row.item_type === 'store' ? 'food' : 'deal';
+
+      return {
+        id,
+        rawId: row.item_id,
+        item_type: row.item_type,
+        name: item.title || 'Offer',
+        emoji: item.emoji || '🎁',
+        tag: item.subtitle || row.item_type,
+        off: item.off_text || 'Saved',
+        price: item.price || '—',
+        image_url: item.image_url || null,
+        bg: [item.bg_color || '#7b2fcd', '#c03b8f'],
+        saved: timeAgo(row.saved_at),
+        category,
+      };
+    });
+  }, []);
+
+  const syncWishlistData = useCallback(async () => {
+    try {
+      const [wishlistRes, historyRes] = await Promise.all([getWishlist(), getWishlistHistory()]);
+      const normalized = normalizeWishlistItems(wishlistRes.data || []);
+
+      setWishlistItems(normalized);
+      setWishlistHistory(historyRes.data || []);
+
+      const map = {};
+      normalized.forEach((item) => {
+        map[item.id] = true;
+      });
+      setWishlistMap(map);
+    } catch (_) {
+      // Ignore when unauthenticated or network is unavailable.
+    }
+  }, [normalizeWishlistItems]);
+
+  const toggleWishlist = useCallback(async (itemType, item) => {
+    const key = `${itemType}:${item.id}`;
+    const isSaved = !!wishlistMap[key];
+
+    try {
+      if (isSaved) {
+        await removeFromWishlist(itemType, item.id);
+      } else {
+        await addToWishlist(itemType, item.id);
+      }
+
+      await syncWishlistData();
+      haptic();
+    } catch (_) {
+      // Keep UX non-blocking on API failure.
+    }
+  }, [wishlistMap, syncWishlistData]);
+
+  const removeWishlistItem = useCallback(async (compositeId) => {
+    const [itemType, rawId] = String(compositeId).split(':');
+    if (!itemType || !rawId) return;
+
+    try {
+      await removeFromWishlist(itemType, Number(rawId));
+      await syncWishlistData();
+    } catch (_) {
+      // Ignore remove failures in offline mode.
+    }
+  }, [syncWishlistData]);
 
   const applyHomeData = (data, lat, lng) => {
-    if (data.banners?.length)     setBanners(data.banners.map(b => ({ id: String(b.id), title: b.title, sub: b.sub, badge: b.badge, colors: [b.color_start, b.color_end], emojis: [b.emoji_1, b.emoji_2, b.emoji_3].filter(Boolean) })));
-    if (data.flash_deals?.length) setFlashDeals(data.flash_deals.map(d => ({ id: String(d.id), name: d.name, off: d.off_text, emoji: d.emoji, bg: [d.bg_start, d.bg_end] })));
-    if (data.deal_cards?.length)  setDealCards(data.deal_cards.map(c => ({ id: String(c.id), title: c.title, desc: c.description, emoji: c.emoji, color: [c.color_start, c.color_end] })));
+    if (data.banners?.length)     setBanners(data.banners.map(b => ({ id: String(b.id), title: b.title, sub: b.sub, badge: b.badge, image_url: b.image_url || null, colors: [b.color_start, b.color_end], emojis: [b.emoji_1, b.emoji_2, b.emoji_3].filter(Boolean) })));
+    if (data.flash_deals?.length) setFlashDeals(data.flash_deals.map(d => ({ id: String(d.id), name: d.name, off: d.off_text, emoji: d.emoji, image_url: d.image_url || null, bg: [d.bg_start, d.bg_end] })));
+    if (data.deal_cards?.length)  setDealCards(data.deal_cards.map(c => ({ id: String(c.id), title: c.title, desc: c.description, emoji: c.emoji, image_url: c.image_url || null, color: [c.color_start, c.color_end] })));
     const normalize = (s, idx = 0) => {
       const src = s?.store || s || {};
       const safeId = src.id ?? s?.store_id ?? `${src.name || 'store'}-${idx}`;
@@ -1676,12 +1810,14 @@ export default function HomeScreen({ onLogout }) {
       } else {
         await startLocationWatch();
       }
+      await syncWishlistData();
     } catch (_) {}
     setRefreshing(false);
-  }, []);
+  }, [syncWishlistData]);
 
   useEffect(() => {
     startLocationWatch();
+    syncWishlistData();
     // Poll every 30s so admin panel changes reflect automatically
     const pollInterval = setInterval(async () => {
       const last = lastLatLngRef.current;
@@ -1696,7 +1832,7 @@ export default function HomeScreen({ onLogout }) {
       if (watcherRef.current) watcherRef.current.remove();
       clearInterval(pollInterval);
     };
-  }, []);
+  }, [syncWishlistData]);
 
   return (
     <ThemeContext.Provider value={{ colors: themeColors, dark: darkMode, setDark: setDarkMode, onLogout }}>
@@ -1758,7 +1894,13 @@ export default function HomeScreen({ onLogout }) {
       )}
 
       {/* ── Non-home Tabs ── */}
-      {activeTab === 'wishlist' && <WishlistView />}
+      {activeTab === 'wishlist' && (
+        <WishlistView
+          items={wishlistItems}
+          history={wishlistHistory}
+          onRemove={removeWishlistItem}
+        />
+      )}
       {activeTab === 'profile' && <ProfileView />}
       {(activeTab === 'explore' || activeTab === 'offers') && (
         <ExploreMapView
@@ -1833,7 +1975,13 @@ export default function HomeScreen({ onLogout }) {
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 14, gap: 12, paddingBottom: 4 }}>
           {flashDeals.map((item) => (
-            <FlashDealCard key={item.id} item={item} countdown={countdown} />
+            <FlashDealCard
+              key={item.id}
+              item={item}
+              countdown={countdown}
+              isSaved={!!wishlistMap[`flash_deal:${item.id}`]}
+              onToggleWishlist={toggleWishlist}
+            />
           ))}
         </ScrollView>
 
@@ -1842,7 +1990,12 @@ export default function HomeScreen({ onLogout }) {
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 14, gap: 12, paddingBottom: 4 }}>
           {dealCards.map((deal) => (
-            <DealCard key={deal.id} deal={deal} />
+            <DealCard
+              key={deal.id}
+              deal={deal}
+              isSaved={!!wishlistMap[`deal_card:${deal.id}`]}
+              onToggleWishlist={toggleWishlist}
+            />
           ))}
         </ScrollView>
 
@@ -1853,7 +2006,13 @@ export default function HomeScreen({ onLogout }) {
             <ScrollView horizontal showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: 14, gap: 14, paddingBottom: 4 }}>
               {interestMatchedStores.map((s) => (
-                <PopularCard key={`interest-${s.id}`} store={s} onPress={() => { haptic(); setSelectedStore(s); }} />
+                <PopularCard
+                  key={`interest-${s.id}`}
+                  store={s}
+                  onPress={() => { haptic(); setSelectedStore(s); }}
+                  isSaved={!!wishlistMap[`store:${s.id}`]}
+                  onToggleWishlist={toggleWishlist}
+                />
               ))}
             </ScrollView>
           </>
@@ -1891,7 +2050,13 @@ export default function HomeScreen({ onLogout }) {
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 14, gap: 14, paddingBottom: 4 }}>
           {popularStores.map((s) => (
-            <PopularCard key={s.id} store={s} onPress={() => { haptic(); setSelectedStore(s); }} />
+            <PopularCard
+              key={s.id}
+              store={s}
+              onPress={() => { haptic(); setSelectedStore(s); }}
+              isSaved={!!wishlistMap[`store:${s.id}`]}
+              onToggleWishlist={toggleWishlist}
+            />
           ))}
         </ScrollView>
 
@@ -1899,7 +2064,13 @@ export default function HomeScreen({ onLogout }) {
         <SectionHeader title="Close to you" subtitle="Within 5 Km" accent />
         <View style={styles.nearbyGrid}>
           {nearbyStores.map((s) => (
-            <NearbyCard key={s.id} store={s} onPress={() => { haptic(); setSelectedStore(s); }} />
+            <NearbyCard
+              key={s.id}
+              store={s}
+              onPress={() => { haptic(); setSelectedStore(s); }}
+              isSaved={!!wishlistMap[`store:${s.id}`]}
+              onToggleWishlist={toggleWishlist}
+            />
           ))}
         </View>
 
@@ -2319,6 +2490,25 @@ const styles = StyleSheet.create({
   sheetShareIcon: { fontSize: 22 },
 
   /* Flash deal share */
+  heroImage: { width: 96, height: 96, borderRadius: 14 },
+  flashImage: { width: 62, height: 62, borderRadius: 14, marginBottom: 2 },
+  dealImage: { width: 56, height: 56, borderRadius: 14, marginBottom: 8 },
+  quickSaveBtn: {
+    position: 'absolute', top: 8, right: 8,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)',
+    alignItems: 'center', justifyContent: 'center',
+    zIndex: 5,
+  },
+  quickSaveText: { color: '#ffffff', fontSize: 14, fontFamily: 'Nunito_800ExtraBold' },
+  quickSaveBtnSmall: {
+    position: 'absolute', top: 6, right: 6,
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    alignItems: 'center', justifyContent: 'center', zIndex: 5,
+  },
+  quickSaveTextSmall: { color: '#7b2fcd', fontSize: 13, fontFamily: 'Nunito_800ExtraBold' },
   flashShareBtn: {
     marginTop: 8,
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -2513,6 +2703,24 @@ const styles = StyleSheet.create({
   },
   wishlistPromoTitle: { fontSize: 18, fontFamily: 'Nunito_800ExtraBold', color: '#ffffff', marginBottom: 3 },
   wishlistPromoSub: { fontSize: 12, fontFamily: 'Nunito_400Regular', color: 'rgba(255,255,255,0.85)' },
+  wishlistHistoryCard: {
+    borderRadius: 16,
+    padding: 14,
+    gap: 10,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+  },
+  wishlistHistoryTitle: { fontSize: 15, fontFamily: 'Nunito_800ExtraBold' },
+  wishlistHistoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  wishlistHistoryEmoji: { fontSize: 20 },
+  wishlistHistoryText: { fontSize: 13, fontFamily: 'Nunito_700Bold' },
+  wishlistHistorySub: { fontSize: 11, color: '#9ca3af', marginTop: 1, fontFamily: 'Nunito_400Regular' },
 
   /* Notifications Panel */
   notifsOverlay: {

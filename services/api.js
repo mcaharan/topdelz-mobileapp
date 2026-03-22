@@ -66,4 +66,16 @@ export const getHomeData = (lat, lng) => {
   return api.get('/home-data', { params }).then((r) => r.data);
 };
 
+export const getWishlist = () =>
+  api.get('/wishlist').then((r) => r.data);
+
+export const getWishlistHistory = () =>
+  api.get('/wishlist/history').then((r) => r.data);
+
+export const addToWishlist = (itemType, itemId) =>
+  api.post(`/wishlist/${itemType}/${itemId}`).then((r) => r.data);
+
+export const removeFromWishlist = (itemType, itemId) =>
+  api.delete(`/wishlist/${itemType}/${itemId}`).then((r) => r.data);
+
 export default api;
