@@ -278,7 +278,7 @@ function SectionHeader({ title, subtitle, accent }) {
   );
 }
 
-function BannerSlider({ banners = BANNERS }) {
+function BannerSlider({ banners = BANNERS, onOpenStore, onOpenMultipleStores }) {
   const [index, setIndex] = useState(0);
   const scrollRef = useRef(null);
 
@@ -319,10 +319,22 @@ function BannerSlider({ banners = BANNERS }) {
               </View>
               <Text style={styles.heroOffer}>{b.title}</Text>
               <Text style={styles.heroSub}>{b.sub}</Text>
-              <Pressable style={styles.heroBtn}>
-                <Text style={styles.heroBtnText}>Order now →</Text>
-              </Pressable>
-              <Text style={styles.heroFine}>*Valid on orders above ₹200</Text>
+              {b.cta_enabled && (
+                <Pressable
+                  style={styles.heroBtn}
+                  onPress={() => {
+                    const linked = b.linked_stores || [];
+                    if (linked.length === 1) {
+                      onOpenStore?.(linked[0], 'banner-direct');
+                    } else if (linked.length > 1) {
+                      onOpenMultipleStores?.(b);
+                    }
+                  }}
+                >
+                  <Text style={styles.heroBtnText}>{b.cta_text || 'Order now →'}</Text>
+                </Pressable>
+              )}
+              <Text style={styles.heroFine}>{b.fine_print || '*Valid on orders above ₹200'}</Text>
             </View>
             <View style={styles.heroEmojisCol}>
               {b.image_url ? (
@@ -1627,6 +1639,7 @@ export default function HomeScreen({ onLogout }) {
   const [popularStores, setPopularStores] = useState(POPULAR_STORES);
   const [nearbyStores, setNearbyStores]   = useState(NEARBY_STORES);
   const [interestMatchedStores, setInterestMatchedStores] = useState([]);
+  const [bannerStorePicker, setBannerStorePicker] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [wishlistItems, setWishlistItems] = useState([]);
   const [wishlistHistory, setWishlistHistory] = useState([]);
@@ -1719,9 +1732,6 @@ export default function HomeScreen({ onLogout }) {
   }, [logOfferEvent]);
 
   const applyHomeData = (data, lat, lng) => {
-    if (data.banners?.length)     setBanners(data.banners.map(b => ({ id: String(b.id), title: b.title, sub: b.sub, badge: b.badge, image_url: b.image_url || null, colors: [b.color_start, b.color_end], emojis: [b.emoji_1, b.emoji_2, b.emoji_3].filter(Boolean) })));
-    if (data.flash_deals?.length) setFlashDeals(data.flash_deals.map(d => ({ id: String(d.id), name: d.name, off: d.off_text, emoji: d.emoji, image_url: d.image_url || null, bg: [d.bg_start, d.bg_end] })));
-    if (data.deal_cards?.length)  setDealCards(data.deal_cards.map(c => ({ id: String(c.id), title: c.title, desc: c.description, emoji: c.emoji, image_url: c.image_url || null, color: [c.color_start, c.color_end] })));
     const normalize = (s, idx = 0) => {
       const src = s?.store || s || {};
       const safeId = src.id ?? s?.store_id ?? `${src.name || 'store'}-${idx}`;
@@ -1741,6 +1751,25 @@ export default function HomeScreen({ onLogout }) {
         deals: (src.deals || []).map((d) => ({ id: String(d.id), name: d.name, off: d.off_text, price: d.price })),
       };
     };
+
+    if (data.banners?.length) {
+      setBanners(data.banners.map((b) => ({
+        id: String(b.id),
+        title: b.title,
+        sub: b.sub,
+        badge: b.badge,
+        image_url: b.image_url || null,
+        cta_enabled: !!b.cta_enabled,
+        cta_text: b.cta_text || 'Order now →',
+        fine_print: b.fine_print || '*Valid on orders above ₹200',
+        colors: [b.color_start, b.color_end],
+        emojis: [b.emoji_1, b.emoji_2, b.emoji_3].filter(Boolean),
+        linked_stores: (b.linked_stores || []).map((s, idx) => normalize(s, idx)).filter((s) => s.name),
+      })));
+    }
+
+    if (data.flash_deals?.length) setFlashDeals(data.flash_deals.map(d => ({ id: String(d.id), name: d.name, off: d.off_text, emoji: d.emoji, image_url: d.image_url || null, bg: [d.bg_start, d.bg_end] })));
+    if (data.deal_cards?.length)  setDealCards(data.deal_cards.map(c => ({ id: String(c.id), title: c.title, desc: c.description, emoji: c.emoji, image_url: c.image_url || null, color: [c.color_start, c.color_end] })));
 
     const interestRaw =
       data.interest_matched_stores ||
@@ -1981,7 +2010,11 @@ export default function HomeScreen({ onLogout }) {
 
         {/* Deal of the Day Banner */}
         <SectionHeader title="Deal of the Day" subtitle="Based on your Interest" accent />
-        <BannerSlider banners={banners} />
+        <BannerSlider
+          banners={banners}
+          onOpenStore={(store) => openStore(store, 'banner-direct')}
+          onOpenMultipleStores={(banner) => setBannerStorePicker(banner)}
+        />
 
         {/* Special Offer Strip */}
         <SpecialOfferStrip />
@@ -2114,6 +2147,42 @@ export default function HomeScreen({ onLogout }) {
         <StoreDetailSheet store={selectedStore} onClose={() => setSelectedStore(null)} />
       )}
 
+      {bannerStorePicker && (
+        <Modal transparent animationType="fade" visible onRequestClose={() => setBannerStorePicker(null)}>
+          <View style={styles.bannerStoreOverlay}>
+            <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setBannerStorePicker(null)} />
+            <View style={styles.bannerStoreSheet}>
+              <Text style={styles.bannerStoreTitle}>Linked Stores</Text>
+              <Text style={styles.bannerStoreSub}>{bannerStorePicker.title}</Text>
+              <ScrollView style={{ maxHeight: 280 }} contentContainerStyle={{ gap: 8, paddingTop: 8 }}>
+                {(bannerStorePicker.linked_stores || []).map((s) => (
+                  <Pressable
+                    key={`banner-store-${s.id}`}
+                    style={styles.bannerStoreRow}
+                    onPress={() => {
+                      setBannerStorePicker(null);
+                      openStore(s, 'banner-multi');
+                    }}
+                  >
+                    <View style={[styles.bannerStoreEmojiWrap, { backgroundColor: s.bg || '#f3f4f6' }]}>
+                      <Text style={{ fontSize: 20 }}>{s.emoji || '🏬'}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.bannerStoreName}>{s.name}</Text>
+                      <Text style={styles.bannerStoreMeta}>{s.dist || '—'} · {s.area || 'Area'}</Text>
+                    </View>
+                    <Text style={styles.bannerStoreArrow}>›</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <Pressable style={styles.bannerStoreClose} onPress={() => setBannerStorePicker(null)}>
+                <Text style={styles.bannerStoreCloseText}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+      )}
+
       {showNotifs && (
         <NotificationsPanel onClose={() => setShowNotifs(false)} />
       )}
@@ -2239,6 +2308,50 @@ const styles = StyleSheet.create({
   },
   heroBtnText: { fontSize: 13, fontFamily: 'Nunito_700Bold', color: '#1a1060' },
   heroFine: { fontSize: 10, fontFamily: 'Nunito_400Regular', color: 'rgba(255,255,255,0.6)' },
+  bannerStoreOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'center',
+    padding: 18,
+  },
+  bannerStoreSheet: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  bannerStoreTitle: { fontSize: 18, color: '#111827', fontFamily: 'Nunito_800ExtraBold' },
+  bannerStoreSub: { fontSize: 13, color: '#64748b', marginTop: 2, fontFamily: 'Nunito_600SemiBold' },
+  bannerStoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#eef2ff',
+    padding: 10,
+    backgroundColor: '#f8fafc',
+  },
+  bannerStoreEmojiWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bannerStoreName: { color: '#0f172a', fontSize: 14, fontFamily: 'Nunito_700Bold' },
+  bannerStoreMeta: { color: '#94a3b8', fontSize: 12, marginTop: 2, fontFamily: 'Nunito_600SemiBold' },
+  bannerStoreArrow: { color: '#6366f1', fontSize: 22, fontFamily: 'Nunito_800ExtraBold' },
+  bannerStoreClose: {
+    marginTop: 12,
+    alignSelf: 'flex-end',
+    backgroundColor: '#111827',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  bannerStoreCloseText: { color: '#fff', fontSize: 13, fontFamily: 'Nunito_700Bold' },
   heroEmojisCol: { alignItems: 'center', gap: 2, marginLeft: 10 },
   dotsRow: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#dddddd' },
