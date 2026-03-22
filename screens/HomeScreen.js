@@ -1624,11 +1624,12 @@ export default function HomeScreen({ onLogout }) {
   const watcherRef      = useRef(null);   // Location.watchPositionAsync subscription
   const lastLatLngRef   = useRef(null);   // last coords sent to API (avoid redundant calls)
   const [banners, setBanners]           = useState([]);
-  const [flashDeals, setFlashDeals]     = useState(FLASH_DEALS);
-  const [dealCards, setDealCards]       = useState(DEALS);
-  const [popularStores, setPopularStores] = useState(POPULAR_STORES);
-  const [nearbyStores, setNearbyStores]   = useState(NEARBY_STORES);
+  const [flashDeals, setFlashDeals]     = useState([]);
+  const [dealCards, setDealCards]       = useState([]);
+  const [popularStores, setPopularStores] = useState([]);
+  const [nearbyStores, setNearbyStores]   = useState([]);
   const [interestMatchedStores, setInterestMatchedStores] = useState([]);
+  const [serviceability, setServiceability] = useState({ in_service_area: true, service_area_name: 'Pondicherry' });
   const [bannerStorePicker, setBannerStorePicker] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [wishlistItems, setWishlistItems] = useState([]);
@@ -1722,6 +1723,8 @@ export default function HomeScreen({ onLogout }) {
   }, [logOfferEvent]);
 
   const applyHomeData = (data, lat, lng) => {
+    setServiceability(data?.serviceability || { in_service_area: true, service_area_name: 'Pondicherry' });
+
     const normalize = (s, idx = 0) => {
       const src = s?.store || s || {};
       const safeId = src.id ?? s?.store_id ?? `${src.name || 'store'}-${idx}`;
@@ -1769,8 +1772,17 @@ export default function HomeScreen({ onLogout }) {
       setBanners([]);
     }
 
-    if (data.flash_deals?.length) setFlashDeals(data.flash_deals.map(d => ({ id: String(d.id), name: d.name, off: d.off_text, emoji: d.emoji, image_url: d.image_url || null, bg: [d.bg_start, d.bg_end] })));
-    if (data.deal_cards?.length)  setDealCards(data.deal_cards.map(c => ({ id: String(c.id), title: c.title, desc: c.description, emoji: c.emoji, image_url: c.image_url || null, color: [c.color_start, c.color_end] })));
+    if (data.flash_deals?.length) {
+      setFlashDeals(data.flash_deals.map(d => ({ id: String(d.id), name: d.name, off: d.off_text, emoji: d.emoji, image_url: d.image_url || null, bg: [d.bg_start, d.bg_end] })));
+    } else {
+      setFlashDeals([]);
+    }
+
+    if (data.deal_cards?.length) {
+      setDealCards(data.deal_cards.map(c => ({ id: String(c.id), title: c.title, desc: c.description, emoji: c.emoji, image_url: c.image_url || null, color: [c.color_start, c.color_end] })));
+    } else {
+      setDealCards([]);
+    }
 
     const interestRaw =
       data.interest_matched_stores ||
@@ -1793,8 +1805,13 @@ export default function HomeScreen({ onLogout }) {
         .filter(s => s.type === 'nearby' || s.type === 'both')
         .map((s, idx) => normalize(s, idx));
       setNearbyStores(nearby);
+    } else {
+      setPopularStores([]);
+      setNearbyStores([]);
     }
   };
+
+  const showNotServiceable = serviceability?.in_service_area === false;
 
   // Called every time watchPositionAsync fires (or on first fix)
   const handleNewPosition = async (pos) => {
@@ -1985,6 +2002,24 @@ export default function HomeScreen({ onLogout }) {
           />
         }
       >
+        {showNotServiceable ? (
+          <View style={styles.notServiceableCard}>
+            <Text style={styles.notServiceableEmoji}>📍</Text>
+            <Text style={styles.notServiceableTitle}>Currently Not Serviceable</Text>
+            <Text style={styles.notServiceableText}>
+              Topdelz currently serves only {serviceability?.service_area_name || 'configured service area'}.
+            </Text>
+            {serviceability?.distance_from_center_km != null && serviceability?.radius_km != null ? (
+              <Text style={styles.notServiceableMeta}>
+                You are {Math.round(serviceability.distance_from_center_km)} km away. Service radius: {Math.round(serviceability.radius_km)} km.
+              </Text>
+            ) : null}
+            <Pressable style={styles.notServiceableBtn} onPress={() => startLocationWatch()}>
+              <Text style={styles.notServiceableBtnText}>Retry Location</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <>
         {/* Greeting Strip */}
         <LinearGradient
           colors={['#ede9fe', '#fce7f3']}
@@ -2148,6 +2183,8 @@ export default function HomeScreen({ onLogout }) {
           <Image source={require('../assets/logo.png')} style={styles.footerLogo} resizeMode="contain" />
           <Text style={styles.footerCredit}>Crafted with love in Puducherry, India 🇮🇳</Text>
         </LinearGradient>
+          </>
+        )}
       </ScrollView>
       )}
 
@@ -2172,6 +2209,28 @@ export default function HomeScreen({ onLogout }) {
 /* ─── Styles ─────────────────────────────────────────────── */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f2f2f7' },
+  notServiceableCard: {
+    marginHorizontal: 14,
+    marginTop: 24,
+    borderRadius: 18,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 18,
+    alignItems: 'center',
+  },
+  notServiceableEmoji: { fontSize: 34, marginBottom: 8 },
+  notServiceableTitle: { fontSize: 18, color: '#0f172a', fontFamily: 'Nunito_800ExtraBold', textAlign: 'center' },
+  notServiceableText: { fontSize: 13, color: '#475569', fontFamily: 'Nunito_600SemiBold', textAlign: 'center', marginTop: 8 },
+  notServiceableMeta: { fontSize: 12, color: '#64748b', fontFamily: 'Nunito_600SemiBold', textAlign: 'center', marginTop: 8 },
+  notServiceableBtn: {
+    marginTop: 12,
+    backgroundColor: '#1d4ed8',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  notServiceableBtnText: { color: '#fff', fontSize: 13, fontFamily: 'Nunito_700Bold' },
 
   /* Full-page navigation views */
   fullPageWrap: { flex: 1 },
