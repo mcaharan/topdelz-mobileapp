@@ -1069,110 +1069,100 @@ function ProfileView() {
   );
 }
 
-/* ─── Store Detail Bottom Sheet ─────────────────────────── */
-function StoreDetailSheet({ store, onClose }) {
+/* ─── Linked Stores Page ────────────────────────────────── */
+function LinkedStoresPage({ banner, onBack, onOpenStore }) {
   const { colors } = useContext(ThemeContext);
-  const slideAnim = useRef(new Animated.Value(600)).current;
-
-  useEffect(() => {
-    Animated.spring(slideAnim, {
-      toValue: 0,
-      useNativeDriver: true,
-      tension: 60,
-      friction: 12,
-    }).start();
-  }, []);
-
-  const close = () => {
-    Animated.timing(slideAnim, {
-      toValue: 600,
-      duration: 230,
-      useNativeDriver: true,
-    }).start(() => onClose());
-  };
+  const linkedStores = banner?.linked_stores || [];
 
   return (
-    <Modal transparent visible animationType="none" onRequestClose={close}>
-      <View style={styles.sheetOverlay}>
-        <Pressable style={StyleSheet.absoluteFillObject} onPress={close} />
-        <Animated.View style={[styles.sheetContainer, { backgroundColor: colors.sheetBg, transform: [{ translateY: slideAnim }] }]}>
-          {/* Handle */}
-          <View style={styles.sheetHandle} />
+    <View style={[styles.fullPageWrap, { backgroundColor: colors.bg }]}> 
+      <LinearGradient colors={['#7b2fcd', '#c03b8f']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.fullPageHeader}> 
+        <Pressable style={styles.fullPageBackBtn} onPress={onBack}>
+          <Text style={styles.fullPageBackText}>‹ Back</Text>
+        </Pressable>
+        <Text style={styles.fullPageTitle}>Linked Stores</Text>
+        <Text style={styles.fullPageSub}>{banner?.title || 'Deal of the Day'}</Text>
+      </LinearGradient>
 
-          {/* Close button */}
-          <Pressable style={styles.sheetCloseBtn} onPress={close}>
-            <Text style={styles.sheetCloseBtnText}>✕</Text>
-          </Pressable>
-
-          {/* Store icon */}
-          <View style={[styles.sheetIconBox, { backgroundColor: store.bg }]}>
-            <Text style={{ fontSize: 56 }}>{store.emoji}</Text>
+      <ScrollView contentContainerStyle={{ padding: 14, gap: 10, paddingBottom: 20 }}>
+        {linkedStores.length === 0 ? (
+          <View style={styles.fullPageEmpty}>
+            <Text style={styles.fullPageEmptyIcon}>🏬</Text>
+            <Text style={[styles.fullPageEmptyText, { color: colors.subtext }]}>No stores linked for this banner.</Text>
           </View>
+        ) : (
+          linkedStores.map((s) => (
+            <Pressable key={`linked-page-${s.id}`} style={[styles.linkedStoreCard, { backgroundColor: colors.card }]} onPress={() => onOpenStore(s, 'banner-multi-page')}>
+              <View style={[styles.linkedStoreIcon, { backgroundColor: s.bg || '#f3f4f6' }]}>
+                <Text style={{ fontSize: 28 }}>{s.emoji || '🏬'}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.linkedStoreName, { color: colors.text }]} numberOfLines={1}>{s.name}</Text>
+                <Text style={styles.linkedStoreMeta}>{s.dist || '—'} · {s.area || 'Area'} · ⭐ {s.rating || '—'}</Text>
+                {s.tag ? <Text style={styles.linkedStoreTag}>{s.tag}</Text> : null}
+              </View>
+              <Text style={styles.linkedStoreArrow}>›</Text>
+            </Pressable>
+          ))
+        )}
+      </ScrollView>
+    </View>
+  );
+}
 
-          {/* Name + meta */}
-          <Text style={[styles.sheetStoreName, { color: colors.sheetText }]}>{store.name}</Text>
-          <View style={styles.sheetMetaRow}>
-            <Text style={[styles.sheetMetaText, { color: colors.sheetSubText }]}>⭐ {store.rating}</Text>
-            <Text style={[styles.sheetMetaDot, { color: colors.sheetSubText }]}>·</Text>
-            <Text style={[styles.sheetMetaText, { color: colors.sheetSubText }]}>{store.dist}</Text>
-            <Text style={[styles.sheetMetaDot, { color: colors.sheetSubText }]}>·</Text>
-            <Text style={[styles.sheetMetaText, { color: colors.sheetSubText }]}>{store.area}</Text>
-          </View>
+/* ─── Store Details Full Page ───────────────────────────── */
+function StoreDetailsPage({ store, onBack }) {
+  const { colors } = useContext(ThemeContext);
 
-          {/* Open/Closed badge */}
-          <View style={[styles.sheetStatusBadge, store.open ? styles.sheetOpen : styles.sheetClosed]}>
-            <Text style={[styles.sheetStatusText, { color: store.open ? '#15803d' : '#991b1b' }]}>
-              {store.open ? '🟢  Open Now' : '🔴  Closed'}
-            </Text>
-          </View>
+  return (
+    <View style={[styles.fullPageWrap, { backgroundColor: colors.bg }]}> 
+      <LinearGradient colors={['#7b2fcd', '#c03b8f']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.fullPageHeader}> 
+        <Pressable style={styles.fullPageBackBtn} onPress={onBack}>
+          <Text style={styles.fullPageBackText}>‹ Back</Text>
+        </Pressable>
+        <View style={[styles.fullPageHeroIcon, { backgroundColor: store.bg || '#fff' }]}>
+          <Text style={{ fontSize: 42 }}>{store.emoji || '🏬'}</Text>
+        </View>
+        <Text style={styles.fullPageTitle}>{store.name}</Text>
+        <Text style={styles.fullPageSub}>⭐ {store.rating || '—'} · {store.dist || '—'} · {store.area || 'Area'}</Text>
+      </LinearGradient>
 
-          {/* Divider */}
-          <View style={[styles.sheetDivider, { backgroundColor: colors.sheetDivider }]} />
+      <ScrollView contentContainerStyle={{ padding: 14, gap: 12, paddingBottom: 20 }}>
+        <View style={[styles.storeInfoCard, { backgroundColor: colors.card }]}> 
+          <Text style={[styles.storeInfoTitle, { color: colors.text }]}>Store Details</Text>
+          <Text style={[styles.storeInfoRow, { color: colors.subtext }]}>Tag: {store.tag || '—'}</Text>
+          <Text style={[styles.storeInfoRow, { color: colors.subtext }]}>Category: {store.category || '—'}</Text>
+          <Text style={[styles.storeInfoRow, { color: colors.subtext }]}>Food Type: {store.foodType || '—'}</Text>
+          <Text style={[styles.storeInfoRow, { color: colors.subtext }]}>Cuisine: {store.cuisine || '—'}</Text>
+          <Text style={[styles.storeInfoRow, { color: colors.subtext }]}>Phone: {store.phone || '—'}</Text>
+          <Text style={[styles.storeInfoRow, { color: colors.subtext }]}>Address: {store.address || '—'}</Text>
+          <Text style={[styles.storeInfoRow, { color: colors.subtext }]}>Description: {store.description || '—'}</Text>
+          <Text style={[styles.storeInfoRow, { color: colors.subtext }]}>Radius: {store.radiusKm != null ? `${store.radiusKm} km` : '—'}</Text>
+          <Text style={[styles.storeInfoRow, { color: colors.subtext }]}>Coordinates: {store.lat && store.lng ? `${store.lat}, ${store.lng}` : '—'}</Text>
+          <Text style={[styles.storeInfoRow, { color: colors.subtext }]}>Status: {store.open ? 'Open' : 'Closed'}</Text>
+          <Text style={[styles.storeInfoRow, { color: colors.subtext }]}>Interests: {(store.interests || []).length ? store.interests.join(', ') : '—'}</Text>
+        </View>
 
-          {/* Deals list */}
-          <Text style={[styles.sheetDealsTitle, { color: colors.sheetText }]}>Today's Deals</Text>
-          <ScrollView style={{ maxHeight: 160 }} showsVerticalScrollIndicator={false}>
-            {store.deals.map((d) => (
-              <View key={d.id} style={[styles.sheetDealRow, { borderBottomColor: colors.sheetDealBorder }]}>
+        <View style={[styles.storeInfoCard, { backgroundColor: colors.card }]}> 
+          <Text style={[styles.storeInfoTitle, { color: colors.text }]}>Deals</Text>
+          {(store.deals || []).length === 0 ? (
+            <Text style={[styles.storeInfoRow, { color: colors.subtext }]}>No deals available.</Text>
+          ) : (
+            (store.deals || []).map((d) => (
+              <View key={`detail-deal-${d.id}`} style={styles.storeDealRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.sheetDealName, { color: colors.sheetText }]}>{d.name}</Text>
-                  <Text style={[styles.sheetDealPrice, { color: colors.sheetSubText }]}>{d.price}</Text>
+                  <Text style={[styles.storeDealName, { color: colors.text }]}>{d.name}</Text>
+                  <Text style={[styles.storeDealMeta, { color: colors.subtext }]}>{d.price || '—'}</Text>
                 </View>
-                <View style={styles.sheetDealBadge}>
-                  <Text style={styles.sheetDealOff}>{d.off}</Text>
+                <View style={styles.storeDealOffBadge}>
+                  <Text style={styles.storeDealOff}>{d.off || 'Offer'}</Text>
                 </View>
               </View>
-            ))}
-          </ScrollView>
-
-          {/* CTA row */}
-          <View style={styles.sheetCtaRow}>
-            <Pressable
-              onPress={() => { haptic(); close(); }}
-              style={{ flex: 1 }}
-            >
-              <LinearGradient
-                colors={['#7b2fcd', '#c03b8f']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.sheetCta}
-              >
-                <Text style={styles.sheetCtaText}>Get Offer  →</Text>
-              </LinearGradient>
-            </Pressable>
-            <Pressable
-              style={styles.sheetShareBtn}
-              onPress={() => shareItem(
-                `${store.name} Deal`,
-                `${store.emoji} Check out ${store.name} on Topdelz! Up to great deals — ${store.dist} from you.\n🎉 Download Topdelz and save big!`
-              )}
-            >
-              <Text style={styles.sheetShareIcon}>📤</Text>
-            </Pressable>
-          </View>
-        </Animated.View>
-      </View>
-    </Modal>
+            ))
+          )}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -1745,6 +1735,15 @@ export default function HomeScreen({ onLogout }) {
         distKm: src.user_distance_km ?? null,
         rating: src.rating,
         tag: src.tag,
+        category: src.category,
+        foodType: src.food_type,
+        cuisine: src.cuisine,
+        phone: src.phone,
+        address: src.address,
+        description: src.description,
+        radiusKm: src.radius_km,
+        type: src.type,
+        interests: (src.interests || []).map((i) => i.name).filter(Boolean),
         open: src.is_open,
         lat: src.lat,
         lng: src.lng,
@@ -1881,6 +1880,15 @@ export default function HomeScreen({ onLogout }) {
 
   return (
     <ThemeContext.Provider value={{ colors: themeColors, dark: darkMode, setDark: setDarkMode, onLogout }}>
+    {selectedStore ? (
+      <StoreDetailsPage store={selectedStore} onBack={() => setSelectedStore(null)} />
+    ) : bannerStorePicker ? (
+      <LinkedStoresPage
+        banner={bannerStorePicker}
+        onBack={() => setBannerStorePicker(null)}
+        onOpenStore={(store, source) => openStore(store, source)}
+      />
+    ) : (
     <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
       <StatusBar style="light" />
 
@@ -2143,46 +2151,6 @@ export default function HomeScreen({ onLogout }) {
 
       <TabBar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      {selectedStore && (
-        <StoreDetailSheet store={selectedStore} onClose={() => setSelectedStore(null)} />
-      )}
-
-      {bannerStorePicker && (
-        <Modal transparent animationType="fade" visible onRequestClose={() => setBannerStorePicker(null)}>
-          <View style={styles.bannerStoreOverlay}>
-            <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setBannerStorePicker(null)} />
-            <View style={styles.bannerStoreSheet}>
-              <Text style={styles.bannerStoreTitle}>Linked Stores</Text>
-              <Text style={styles.bannerStoreSub}>{bannerStorePicker.title}</Text>
-              <ScrollView style={{ maxHeight: 280 }} contentContainerStyle={{ gap: 8, paddingTop: 8 }}>
-                {(bannerStorePicker.linked_stores || []).map((s) => (
-                  <Pressable
-                    key={`banner-store-${s.id}`}
-                    style={styles.bannerStoreRow}
-                    onPress={() => {
-                      setBannerStorePicker(null);
-                      openStore(s, 'banner-multi');
-                    }}
-                  >
-                    <View style={[styles.bannerStoreEmojiWrap, { backgroundColor: s.bg || '#f3f4f6' }]}>
-                      <Text style={{ fontSize: 20 }}>{s.emoji || '🏬'}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.bannerStoreName}>{s.name}</Text>
-                      <Text style={styles.bannerStoreMeta}>{s.dist || '—'} · {s.area || 'Area'}</Text>
-                    </View>
-                    <Text style={styles.bannerStoreArrow}>›</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-              <Pressable style={styles.bannerStoreClose} onPress={() => setBannerStorePicker(null)}>
-                <Text style={styles.bannerStoreCloseText}>Close</Text>
-              </Pressable>
-            </View>
-          </View>
-        </Modal>
-      )}
-
       {showNotifs && (
         <NotificationsPanel onClose={() => setShowNotifs(false)} />
       )}
@@ -2194,6 +2162,7 @@ export default function HomeScreen({ onLogout }) {
         }} />
       )}
     </View>
+    )}
     </ThemeContext.Provider>
   );
 }
@@ -2201,6 +2170,69 @@ export default function HomeScreen({ onLogout }) {
 /* ─── Styles ─────────────────────────────────────────────── */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f2f2f7' },
+
+  /* Full-page navigation views */
+  fullPageWrap: { flex: 1 },
+  fullPageHeader: { paddingTop: 54, paddingHorizontal: 16, paddingBottom: 14 },
+  fullPageBackBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginBottom: 10,
+  },
+  fullPageBackText: { color: '#fff', fontSize: 13, fontFamily: 'Nunito_700Bold' },
+  fullPageTitle: { color: '#fff', fontSize: 22, fontFamily: 'Nunito_800ExtraBold' },
+  fullPageSub: { color: 'rgba(255,255,255,0.85)', marginTop: 4, fontSize: 13, fontFamily: 'Nunito_600SemiBold' },
+  fullPageHeroIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  fullPageEmpty: { padding: 24, alignItems: 'center', justifyContent: 'center' },
+  fullPageEmptyIcon: { fontSize: 32, marginBottom: 8 },
+  fullPageEmptyText: { fontSize: 14, fontFamily: 'Nunito_600SemiBold' },
+  linkedStoreCard: {
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#eef2ff',
+  },
+  linkedStoreIcon: { width: 52, height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  linkedStoreName: { fontSize: 15, fontFamily: 'Nunito_700Bold' },
+  linkedStoreMeta: { fontSize: 12, color: '#64748b', marginTop: 2, fontFamily: 'Nunito_600SemiBold' },
+  linkedStoreTag: { fontSize: 11, color: '#7b2fcd', marginTop: 4, fontFamily: 'Nunito_700Bold' },
+  linkedStoreArrow: { fontSize: 24, color: '#7b2fcd', fontFamily: 'Nunito_800ExtraBold' },
+  storeInfoCard: {
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#eef2ff',
+  },
+  storeInfoTitle: { fontSize: 16, fontFamily: 'Nunito_800ExtraBold', marginBottom: 8 },
+  storeInfoRow: { fontSize: 13, fontFamily: 'Nunito_600SemiBold', marginBottom: 5, lineHeight: 19 },
+  storeDealRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    paddingTop: 10,
+    marginTop: 10,
+  },
+  storeDealName: { fontSize: 14, fontFamily: 'Nunito_700Bold' },
+  storeDealMeta: { fontSize: 12, marginTop: 2, fontFamily: 'Nunito_600SemiBold' },
+  storeDealOffBadge: { backgroundColor: '#ede9fe', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  storeDealOff: { color: '#6d28d9', fontSize: 11, fontFamily: 'Nunito_800ExtraBold' },
 
   /* Top Bar */
   topBar: {
