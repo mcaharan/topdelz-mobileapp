@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback } f
 import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { Marker, Callout, PROVIDER_DEFAULT } from 'react-native-maps';
 import {
+  Alert,
   Animated,
   Dimensions,
   Image,
@@ -1630,6 +1631,7 @@ export default function HomeScreen({ onLogout }) {
   const [nearbyStores, setNearbyStores]   = useState([]);
   const [interestMatchedStores, setInterestMatchedStores] = useState([]);
   const [serviceability, setServiceability] = useState({ in_service_area: true, service_area_name: 'Pondicherry', areas: [] });
+  const serviceabilityAlertShownRef = useRef(false);
   const [bannerStorePicker, setBannerStorePicker] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [wishlistItems, setWishlistItems] = useState([]);
@@ -1723,7 +1725,32 @@ export default function HomeScreen({ onLogout }) {
   }, [logOfferEvent]);
 
   const applyHomeData = (data, lat, lng) => {
-    setServiceability(data?.serviceability || { in_service_area: true, service_area_name: 'Pondicherry', areas: [] });
+    const incomingServiceability = data?.serviceability || {};
+    const isNotServiceable = data?.not_serviceable === true || incomingServiceability?.in_service_area === false;
+    const serviceabilityReason = String(incomingServiceability?.reason || '');
+
+    if (!isNotServiceable) {
+      serviceabilityAlertShownRef.current = false;
+    }
+
+    if (isNotServiceable && serviceabilityReason === 'no_active_serviceability' && !serviceabilityAlertShownRef.current) {
+      serviceabilityAlertShownRef.current = true;
+      Alert.alert(
+        'Serviceability Inactive',
+        'Serviceability is currently inactive for all areas. Please try again later.'
+      );
+    }
+
+    setServiceability({
+      ...incomingServiceability,
+      in_service_area: !isNotServiceable,
+      service_area_name: incomingServiceability?.service_area_name || 'Pondicherry',
+      areas: Array.isArray(incomingServiceability?.areas) ? incomingServiceability.areas : [],
+    });
+
+    if (isNotServiceable) {
+      setActiveTab('home');
+    }
 
     const normalize = (s, idx = 0) => {
       const src = s?.store || s || {};
@@ -1846,7 +1873,12 @@ export default function HomeScreen({ onLogout }) {
     setLocLoading(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') { setLocLoading(false); return; }
+      if (status !== 'granted') {
+        // Fallback: still fetch home data, backend can use last known user location.
+        getHomeData().then(data => applyHomeData(data, null, null)).catch(() => {});
+        setLocLoading(false);
+        return;
+      }
 
       // Get an immediate fix first so the UI isn't blank
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -1859,7 +1891,11 @@ export default function HomeScreen({ onLogout }) {
         { accuracy: Location.Accuracy.Balanced, distanceInterval: 50, timeInterval: 30000 },
         (newPos) => handleNewPosition(newPos)
       );
-    } catch (_) { setLocLoading(false); }
+    } catch (_) {
+      // If GPS fails, still try loading via backend fallback coordinates.
+      getHomeData().then(data => applyHomeData(data, null, null)).catch(() => {});
+      setLocLoading(false);
+    }
   };
 
   // Manual pull-to-refresh: force re-fetch from API using last known coords
