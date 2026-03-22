@@ -20,7 +20,7 @@ import {
   View,
 } from 'react-native';
 import * as Location from 'expo-location';
-import { addToWishlist, getHomeData, getProfile, getWishlist, getWishlistHistory, removeFromWishlist, updateProfile } from '../services/api';
+import { addToWishlist, getHomeData, getProfile, getWishlist, getWishlistHistory, removeFromWishlist, trackOfferEvent, updateProfile } from '../services/api';
 
 const { width, height } = Dimensions.get('window');
 const haptic = () => Vibration.vibrate(8);
@@ -346,7 +346,7 @@ function BannerSlider({ banners = BANNERS }) {
   );
 }
 
-function FlashDealCard({ item, countdown, isSaved, onToggleWishlist }) {
+function FlashDealCard({ item, countdown, isSaved, onToggleWishlist, onOpen }) {
   return (
     <LinearGradient colors={item.bg} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.flashCard}>
       <Pressable style={styles.quickSaveBtn} onPress={() => onToggleWishlist?.('flash_deal', item)}>
@@ -363,6 +363,9 @@ function FlashDealCard({ item, countdown, isSaved, onToggleWishlist }) {
         <Text style={styles.flashTimerIcon}>⏱</Text>
         <Text style={styles.flashTimer}>{countdown}</Text>
       </View>
+      <Pressable style={styles.flashViewBtn} onPress={() => onOpen?.(item)}>
+        <Text style={styles.flashViewText}>View Deal</Text>
+      </Pressable>
       <Pressable
         style={styles.flashShareBtn}
         onPress={() => shareItem(
@@ -397,7 +400,7 @@ function SpecialOfferStrip() {
   );
 }
 
-function DealCard({ deal, isSaved, onToggleWishlist }) {
+function DealCard({ deal, isSaved, onToggleWishlist, onOpen }) {
   return (
     <LinearGradient colors={deal.color} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.dealCard}>
       <Pressable style={styles.quickSaveBtn} onPress={() => onToggleWishlist?.('deal_card', deal)}>
@@ -412,7 +415,7 @@ function DealCard({ deal, isSaved, onToggleWishlist }) {
       <Text style={styles.dealTitle}>{deal.title}</Text>
       <Text style={styles.dealDesc}>{deal.desc}</Text>
       <View style={styles.dealBtnRow}>
-        <Pressable style={styles.exploreBtn}>
+        <Pressable style={styles.exploreBtn} onPress={() => onOpen?.(deal)}>
           <Text style={styles.exploreBtnText}>Explore now</Text>
         </Pressable>
         <Pressable
@@ -1700,6 +1703,21 @@ export default function HomeScreen({ onLogout }) {
     }
   }, [syncWishlistData]);
 
+  const logOfferEvent = useCallback((itemType, itemId, action, extra = {}) => {
+    trackOfferEvent(itemType, Number(itemId), action, extra).catch(() => {
+      // Keep UX smooth even if analytics call fails.
+    });
+  }, []);
+
+  const openStore = useCallback((store, source = 'home') => {
+    haptic();
+    setSelectedStore(store);
+    logOfferEvent('store', Number(store.id), 'opened', {
+      source,
+      distance_km: store?.distKm ?? null,
+    });
+  }, [logOfferEvent]);
+
   const applyHomeData = (data, lat, lng) => {
     if (data.banners?.length)     setBanners(data.banners.map(b => ({ id: String(b.id), title: b.title, sub: b.sub, badge: b.badge, image_url: b.image_url || null, colors: [b.color_start, b.color_end], emojis: [b.emoji_1, b.emoji_2, b.emoji_3].filter(Boolean) })));
     if (data.flash_deals?.length) setFlashDeals(data.flash_deals.map(d => ({ id: String(d.id), name: d.name, off: d.off_text, emoji: d.emoji, image_url: d.image_url || null, bg: [d.bg_start, d.bg_end] })));
@@ -1733,8 +1751,7 @@ export default function HomeScreen({ onLogout }) {
     if (Array.isArray(interestRaw) && interestRaw.length) {
       const interestStores = interestRaw
         .map((s, idx) => normalize(s, idx))
-        .filter((s) => s.name)
-        .sort((a, b) => (a.distKm ?? 999) - (b.distKm ?? 999));
+        .filter((s) => s.name);
       setInterestMatchedStores(interestStores);
     } else {
       setInterestMatchedStores([]);
@@ -1744,8 +1761,7 @@ export default function HomeScreen({ onLogout }) {
       setPopularStores(data.stores.filter(s => s.type === 'popular' || s.type === 'both').map((s, idx) => normalize(s, idx)));
       const nearby = data.stores
         .filter(s => s.type === 'nearby' || s.type === 'both')
-        .map((s, idx) => normalize(s, idx))
-        .sort((a, b) => (a.distKm ?? 999) - (b.distKm ?? 999));
+        .map((s, idx) => normalize(s, idx));
       setNearbyStores(nearby);
     }
   };
@@ -1904,7 +1920,7 @@ export default function HomeScreen({ onLogout }) {
       {activeTab === 'profile' && <ProfileView />}
       {(activeTab === 'explore' || activeTab === 'offers') && (
         <ExploreMapView
-          onStorePress={(s) => { haptic(); setSelectedStore(s); }}
+          onStorePress={(s) => openStore(s, 'explore-map')}
           allStores={[
             ...popularStores.map((s) => ({ ...s, source: 'popular' })),
             ...nearbyStores.map((s) => ({ ...s, source: 'nearby'  })),
@@ -1981,6 +1997,10 @@ export default function HomeScreen({ onLogout }) {
               countdown={countdown}
               isSaved={!!wishlistMap[`flash_deal:${item.id}`]}
               onToggleWishlist={toggleWishlist}
+              onOpen={(deal) => {
+                haptic();
+                logOfferEvent('flash_deal', Number(deal.id), 'viewed', { source: 'home-flash' });
+              }}
             />
           ))}
         </ScrollView>
@@ -1995,6 +2015,10 @@ export default function HomeScreen({ onLogout }) {
               deal={deal}
               isSaved={!!wishlistMap[`deal_card:${deal.id}`]}
               onToggleWishlist={toggleWishlist}
+              onOpen={(card) => {
+                haptic();
+                logOfferEvent('deal_card', Number(card.id), 'viewed', { source: 'home-featured' });
+              }}
             />
           ))}
         </ScrollView>
@@ -2009,7 +2033,7 @@ export default function HomeScreen({ onLogout }) {
                 <PopularCard
                   key={`interest-${s.id}`}
                   store={s}
-                  onPress={() => { haptic(); setSelectedStore(s); }}
+                  onPress={() => openStore(s, 'interest-matched')}
                   isSaved={!!wishlistMap[`store:${s.id}`]}
                   onToggleWishlist={toggleWishlist}
                 />
@@ -2053,7 +2077,7 @@ export default function HomeScreen({ onLogout }) {
             <PopularCard
               key={s.id}
               store={s}
-              onPress={() => { haptic(); setSelectedStore(s); }}
+              onPress={() => openStore(s, 'popular')}
               isSaved={!!wishlistMap[`store:${s.id}`]}
               onToggleWishlist={toggleWishlist}
             />
@@ -2067,7 +2091,7 @@ export default function HomeScreen({ onLogout }) {
             <NearbyCard
               key={s.id}
               store={s}
-              onPress={() => { haptic(); setSelectedStore(s); }}
+              onPress={() => openStore(s, 'nearby')}
               isSaved={!!wishlistMap[`store:${s.id}`]}
               onToggleWishlist={toggleWishlist}
             />

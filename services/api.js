@@ -78,4 +78,12 @@ export const addToWishlist = (itemType, itemId) =>
 export const removeFromWishlist = (itemType, itemId) =>
   api.delete(`/wishlist/${itemType}/${itemId}`).then((r) => r.data);
 
+export const trackOfferEvent = (itemType, itemId, action, extra = {}) =>
+  api.post('/offer-events', {
+    item_type: itemType,
+    item_id: itemId,
+    action,
+    ...extra,
+  }).then((r) => r.data);
+
 export default api;
