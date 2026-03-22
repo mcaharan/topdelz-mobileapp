@@ -1629,7 +1629,7 @@ export default function HomeScreen({ onLogout }) {
   const [popularStores, setPopularStores] = useState([]);
   const [nearbyStores, setNearbyStores]   = useState([]);
   const [interestMatchedStores, setInterestMatchedStores] = useState([]);
-  const [serviceability, setServiceability] = useState({ in_service_area: true, service_area_name: 'Pondicherry' });
+  const [serviceability, setServiceability] = useState({ in_service_area: true, service_area_name: 'Pondicherry', areas: [] });
   const [bannerStorePicker, setBannerStorePicker] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [wishlistItems, setWishlistItems] = useState([]);
@@ -1723,7 +1723,7 @@ export default function HomeScreen({ onLogout }) {
   }, [logOfferEvent]);
 
   const applyHomeData = (data, lat, lng) => {
-    setServiceability(data?.serviceability || { in_service_area: true, service_area_name: 'Pondicherry' });
+    setServiceability(data?.serviceability || { in_service_area: true, service_area_name: 'Pondicherry', areas: [] });
 
     const normalize = (s, idx = 0) => {
       const src = s?.store || s || {};
@@ -2007,8 +2007,13 @@ export default function HomeScreen({ onLogout }) {
             <Text style={styles.notServiceableEmoji}>📍</Text>
             <Text style={styles.notServiceableTitle}>Currently Not Serviceable</Text>
             <Text style={styles.notServiceableText}>
-              Topdelz currently serves only {serviceability?.service_area_name || 'configured service area'}.
+              Topdelz currently serves only configured service areas.
             </Text>
+            {Array.isArray(serviceability?.areas) && serviceability.areas.length > 0 ? (
+              <Text style={styles.notServiceableMeta}>
+                Service areas: {serviceability.areas.map((a) => a.name).filter(Boolean).join(', ')}
+              </Text>
+            ) : null}
             {serviceability?.distance_from_center_km != null && serviceability?.radius_km != null ? (
               <Text style={styles.notServiceableMeta}>
                 You are {Math.round(serviceability.distance_from_center_km)} km away. Service radius: {Math.round(serviceability.radius_km)} km.
