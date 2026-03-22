@@ -278,7 +278,7 @@ function SectionHeader({ title, subtitle, accent }) {
   );
 }
 
-function BannerSlider({ banners = BANNERS, onOpenStore, onOpenMultipleStores }) {
+function BannerSlider({ banners = [], onOpenStore, onOpenMultipleStores }) {
   const [index, setIndex] = useState(0);
   const scrollRef = useRef(null);
 
@@ -1623,7 +1623,7 @@ export default function HomeScreen({ onLogout }) {
   const [locLoading, setLocLoading]     = useState(false);
   const watcherRef      = useRef(null);   // Location.watchPositionAsync subscription
   const lastLatLngRef   = useRef(null);   // last coords sent to API (avoid redundant calls)
-  const [banners, setBanners]           = useState(BANNERS);
+  const [banners, setBanners]           = useState([]);
   const [flashDeals, setFlashDeals]     = useState(FLASH_DEALS);
   const [dealCards, setDealCards]       = useState(DEALS);
   const [popularStores, setPopularStores] = useState(POPULAR_STORES);
@@ -1751,7 +1751,7 @@ export default function HomeScreen({ onLogout }) {
       };
     };
 
-    if (data.banners?.length) {
+    if (Array.isArray(data.banners)) {
       setBanners(data.banners.map((b) => ({
         id: String(b.id),
         title: b.title,
@@ -1765,6 +1765,8 @@ export default function HomeScreen({ onLogout }) {
         emojis: [b.emoji_1, b.emoji_2, b.emoji_3].filter(Boolean),
         linked_stores: (b.linked_stores || []).map((s, idx) => normalize(s, idx)).filter((s) => s.name),
       })));
+    } else {
+      setBanners([]);
     }
 
     if (data.flash_deals?.length) setFlashDeals(data.flash_deals.map(d => ({ id: String(d.id), name: d.name, off: d.off_text, emoji: d.emoji, image_url: d.image_url || null, bg: [d.bg_start, d.bg_end] })));
