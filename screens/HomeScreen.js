@@ -1,7 +1,9 @@
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import MapView, { Marker, Callout, PROVIDER_DEFAULT } from 'react-native-maps';
 import {
   Alert,
@@ -9,6 +11,7 @@ import {
   Dimensions,
   Image,
   Modal,
+  PanResponder,
   Pressable,
   ScrollView,
   RefreshControl,
@@ -19,12 +22,16 @@ import {
   TextInput,
   Vibration,
   View,
+  Linking,
 } from 'react-native';
 import * as Location from 'expo-location';
-import { addToWishlist, getHomeData, getProfile, getWishlist, getWishlistHistory, removeFromWishlist, trackOfferEvent, updateProfile } from '../services/api';
+import { addToWishlist, getHomeData, getProfile, getWishlist, getWishlistHistory, removeFromWishlist, trackOfferEvent, updateProfile, viewStory } from '../services/api';
 
 const { width, height } = Dimensions.get('window');
 const haptic = () => Vibration.vibrate(8);
+const STORY_DURATION_MS = 30000;
+const STORY_SEEN_IDS_KEY = 'story_seen_ids_v1';
+const STORY_VIEWER_ID_KEY = 'story_viewer_id_v1';
 
 const shareItem = (title, message) => {
   haptic();
@@ -391,6 +398,425 @@ function FlashDealCard({ item, countdown, isSaved, onToggleWishlist, onOpen }) {
     </LinearGradient>
   );
 }
+
+/* ─── StoryRow ───────────────────────────────────────────── */
+function StoryRow({ stories = [], onStoryPress, seenStoryIds = {} }) {
+  if (!stories || !stories.length) return null;
+  return (
+    <View style={{ paddingVertical: 10, backgroundColor: 'transparent' }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 14, gap: 14 }}
+      >
+        {stories.map((story) => {
+          const seen = !!seenStoryIds[String(story.id)];
+          return (<Pressable
+            key={String(story.id)}
+            onPress={() => {
+              haptic();
+              onStoryPress?.(story);
+            }}
+            style={{ alignItems: 'center', gap: 5 }}
+          >
+            <LinearGradient
+              colors={seen ? ['#d1d5db', '#9ca3af'] : ['#7b2fcd', '#c03b8f']}
+              style={{
+                width: 64, height: 64, borderRadius: 32,
+                padding: 3, alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <View style={{
+                width: 58, height: 58, borderRadius: 29,
+                backgroundColor: story.bg_color || '#7b2fcd',
+                overflow: 'hidden', alignItems: 'center', justifyContent: 'center',
+                borderWidth: 2, borderColor: '#fff',
+              }}>
+                {story.image_url ? (
+                  <Image
+                    source={{ uri: story.image_url }}
+                    style={{ width: 58, height: 58 }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 24 }}>{story.emoji || '⭐'}</Text>
+                )}
+              </View>
+            </LinearGradient>
+            <Text
+              style={{
+                fontSize: 11, fontFamily: 'Nunito_600SemiBold',
+                color: '#333', textAlign: 'center', maxWidth: 68,
+              }}
+              numberOfLines={1}
+            >
+              {story.title}
+            </Text>
+          </Pressable>);
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+const StoryViewer = React.memo(function StoryViewer({ visible, storiesList, index, onClose, viewerId, seenStoryIds, onSetStorySeen }) {
+  const [currentIndex, setCurrentIndex] = useState(index || 0);
+  const [viewCount, setViewCount] = useState(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [progressMs, setProgressMs] = useState(0);
+  const translateX = useRef(new Animated.Value(0)).current;
+  const contentOpacity = useRef(new Animated.Value(1)).current;
+  const storyCountsRef = useRef({});
+  const remainingDurationRef = useRef(STORY_DURATION_MS);
+  const longPressTimeoutRef = useRef(null);
+  const holdTriggeredRef = useRef(false);
+  const seenStoryIdsRef = useRef(seenStoryIds || {});
+
+  useEffect(() => {
+    seenStoryIdsRef.current = seenStoryIds || {};
+  }, [seenStoryIds]);
+
+  useEffect(() => {
+    if (!storiesList?.length) {
+      setCurrentIndex(0);
+      return;
+    }
+    const targetId = index;
+    const foundIndex = storiesList.findIndex((item) => String(item.id) === String(targetId));
+    setCurrentIndex(foundIndex >= 0 ? foundIndex : 0);
+  }, [index, storiesList]);
+
+  useEffect(() => {
+    if (visible) {
+      storyCountsRef.current = {};
+      remainingDurationRef.current = STORY_DURATION_MS;
+      setProgressMs(0);
+      setIsPaused(false);
+      holdTriggeredRef.current = false;
+    } else {
+      setProgressMs(0);
+      contentOpacity.setValue(1);
+    }
+  }, [contentOpacity, visible]);
+
+  const goPrev = useCallback(() => {
+    setCurrentIndex((i) => (i > 0 ? i - 1 : i));
+  }, []);
+
+  const goNext = useCallback(() => {
+    const totalStories = storiesList?.length || 0;
+    if (currentIndex + 1 >= totalStories) {
+      setIsPaused(false);
+      setProgressMs(0);
+      onClose?.();
+      return;
+    }
+    setCurrentIndex((i) => i + 1);
+  }, [currentIndex, onClose, storiesList]);
+
+  const pauseStory = useCallback(() => {
+    if (isPaused) return;
+    setIsPaused(true);
+    holdTriggeredRef.current = true;
+    remainingDurationRef.current = Math.max(0, (storiesList?.[currentIndex]?.duration_seconds ?? 30) * 1000 - progressMs);
+  }, [currentIndex, isPaused, progressMs, storiesList]);
+
+  const resumeStory = useCallback(() => {
+    if (!isPaused) return;
+    setIsPaused(false);
+  }, [isPaused]);
+
+  useEffect(() => {
+    if (!visible) return undefined;
+
+    const story = storiesList?.[currentIndex];
+    let mounted = true;
+    if (story && story.media_url) {
+      const storyId = String(story.id);
+      setViewCount(storyCountsRef.current[storyId] ?? story.total_views ?? 0);
+      Image.prefetch(story.media_url).catch(() => {});
+      const next = storiesList?.[currentIndex + 1];
+      const prev = storiesList?.[currentIndex - 1];
+      if (next && next.media_url) Image.prefetch(next.media_url).catch(() => {});
+      if (prev && prev.media_url) Image.prefetch(prev.media_url).catch(() => {});
+
+      if (!seenStoryIdsRef.current[storyId] && viewerId) {
+        viewStory(story.id, viewerId).then((res) => {
+          if (!mounted) return;
+          if (res && res.data && typeof res.data.views !== 'undefined') {
+            storyCountsRef.current[storyId] = res.data.views;
+            setViewCount(res.data.views);
+            onSetStorySeen?.(storyId, true);
+          }
+        }).catch(() => {});
+      }
+
+      const durationMs = Math.max(1000, Number(story.duration_seconds || 30) * 1000);
+      remainingDurationRef.current = durationMs;
+      setProgressMs(0);
+      setIsPaused(false);
+      contentOpacity.setValue(0.82);
+      Animated.timing(contentOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }).start();
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [contentOpacity, currentIndex, onSetStorySeen, storiesList, viewerId, visible]);
+
+  useEffect(() => {
+    if (!visible || isPaused) {
+      return undefined;
+    }
+    const story = storiesList?.[currentIndex];
+    if (!story) {
+      return undefined;
+    }
+
+    const durationMs = Math.max(1000, Number(story.duration_seconds || 30) * 1000);
+    const tickMs = 100;
+    const intervalId = setInterval(() => {
+      setProgressMs((prev) => Math.min(durationMs, prev + tickMs));
+    }, tickMs);
+
+    return () => clearInterval(intervalId);
+  }, [currentIndex, goNext, isPaused, storiesList, visible]);
+
+  useEffect(() => {
+    if (!visible || isPaused) {
+      return;
+    }
+
+    const story = storiesList?.[currentIndex];
+    if (!story) {
+      return;
+    }
+
+    const durationMs = Math.max(1000, Number(story.duration_seconds || 30) * 1000);
+    if (progressMs >= durationMs) {
+      goNext();
+    }
+  }, [currentIndex, goNext, isPaused, progressMs, storiesList, visible]);
+
+  const pan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 6,
+    onPanResponderGrant: () => {
+      holdTriggeredRef.current = false;
+      longPressTimeoutRef.current = setTimeout(() => {
+        pauseStory();
+      }, 220);
+    },
+    onPanResponderMove: (_, gesture) => {
+      if (Math.abs(gesture.dx) > 6 && longPressTimeoutRef.current) {
+        clearTimeout(longPressTimeoutRef.current);
+        longPressTimeoutRef.current = null;
+      }
+      if (holdTriggeredRef.current) {
+        return;
+      }
+      translateX.setValue(gesture.dx);
+    },
+    onPanResponderRelease: (_, gesture) => {
+      if (longPressTimeoutRef.current) {
+        clearTimeout(longPressTimeoutRef.current);
+        longPressTimeoutRef.current = null;
+      }
+      if (holdTriggeredRef.current) {
+        holdTriggeredRef.current = false;
+        resumeStory();
+        Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+        return;
+      }
+      if (isPaused) {
+        resumeStory();
+      }
+      const dx = gesture.dx;
+      const threshold = width * 0.18;
+      if (dx > threshold && currentIndex > 0) {
+        Animated.timing(translateX, { toValue: width, duration: 180, useNativeDriver: true }).start(() => {
+          translateX.setValue(0);
+          goPrev();
+        });
+      } else if (dx < -threshold && currentIndex + 1 < (storiesList?.length || 0)) {
+        Animated.timing(translateX, { toValue: -width, duration: 180, useNativeDriver: true }).start(() => {
+          translateX.setValue(0);
+          goNext();
+        });
+      } else {
+        Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+      }
+    },
+    onPanResponderTerminate: () => {
+      if (longPressTimeoutRef.current) {
+        clearTimeout(longPressTimeoutRef.current);
+        longPressTimeoutRef.current = null;
+      }
+      if (holdTriggeredRef.current) {
+        holdTriggeredRef.current = false;
+      }
+      if (isPaused) {
+        resumeStory();
+      }
+      Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+    },
+  })).current;
+
+  const onShare = async () => {
+    const story = storiesList?.[currentIndex];
+    if (!story) return;
+    try {
+      await Share.share({ message: story.title ? `${story.title}\n${story.media_url}` : story.media_url, url: story.media_url });
+    } catch (_) {}
+  };
+
+  const toggleSeen = useCallback(() => {
+    const story = storiesList?.[currentIndex];
+    if (!story) return;
+    const storyId = String(story.id);
+    onSetStorySeen?.(storyId, !seenStoryIdsRef.current[storyId]);
+  }, [currentIndex, onSetStorySeen, storiesList]);
+
+  const story = storiesList?.[currentIndex] ?? null;
+  const progressWidth = `${Math.max(0, Math.min(100, ((progressMs / Math.max(1000, Number(story?.duration_seconds || 30) * 1000)) * 100)))}%`;
+  const contentScale = translateX.interpolate({
+    inputRange: [-width, 0, width],
+    outputRange: [0.94, 1, 0.94],
+    extrapolate: 'clamp',
+  });
+  const slideOpacity = translateX.interpolate({
+    inputRange: [-width, 0, width],
+    outputRange: [0.72, 1, 0.72],
+    extrapolate: 'clamp',
+  });
+
+  const videoPlayer = useVideoPlayer(story?.media_type === 'video' ? story.media_url : null, (player) => {
+    player.loop = true;
+  });
+
+  useEffect(() => {
+    if (!videoPlayer) return;
+    if (!visible || !story || story.media_type !== 'video' || isPaused) {
+      videoPlayer.pause();
+      return;
+    }
+    videoPlayer.play();
+  }, [isPaused, story, videoPlayer, visible]);
+
+  return (
+    <Modal visible={!!visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.98)', alignItems: 'center', justifyContent: 'center' }}>
+        <Animated.View
+          {...pan.panHandlers}
+          style={{
+            transform: [{ translateX }, { scale: contentScale }],
+            opacity: Animated.multiply(contentOpacity, slideOpacity),
+            width: width,
+            alignItems: 'center',
+            justifyContent: 'center',
+            flex: 1,
+          }}
+        >
+          <View style={{ width: width, height: height * 0.78, alignItems: 'center', justifyContent: 'center' }}>
+            {story ? (
+              story.media_type === 'video' ? (
+                <VideoView
+                  player={videoPlayer}
+                  style={{ width: width, height: height * 0.78 }}
+                  contentFit="contain"
+                  nativeControls={false}
+                />
+              ) : (
+                <Image
+                  source={{ uri: story.media_url, cache: 'force-cache' }}
+                  style={{ width: width, height: height * 0.78 }}
+                  resizeMode="contain"
+                  fadeDuration={0}
+                />
+              )
+            ) : null}
+          </View>
+        </Animated.View>
+
+        <Pressable
+          onPress={goPrev}
+          delayLongPress={220}
+          onLongPress={pauseStory}
+          onPressOut={() => {
+            if (holdTriggeredRef.current || isPaused) {
+              holdTriggeredRef.current = false;
+              resumeStory();
+            }
+          }}
+          style={{ position: 'absolute', left: 0, top: 120, bottom: 120, width: width * 0.28 }}
+        />
+        <Pressable
+          onPress={goNext}
+          delayLongPress={220}
+          onLongPress={pauseStory}
+          onPressOut={() => {
+            if (holdTriggeredRef.current || isPaused) {
+              holdTriggeredRef.current = false;
+              resumeStory();
+            }
+          }}
+          style={{ position: 'absolute', right: 0, top: 120, bottom: 120, width: width * 0.28 }}
+        />
+
+        <View style={{ position: 'absolute', top: 44, left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={{ color: '#fff', fontSize: 16, flex: 1 }}>{story?.title ?? ''}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {isPaused ? <Text style={{ color: '#fff', opacity: 0.8, marginRight: 10 }}>Paused</Text> : null}
+            <Text style={{ color: '#fff', opacity: 0.9, marginRight: 12 }}>{story?.duration_seconds || 30}s</Text>
+            <Pressable onPress={onClose} style={{ padding: 8, marginLeft: 8 }}>
+              <Ionicons name="close-circle-outline" size={24} color="#fff" />
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={{ position: 'absolute', top: 90, left: 16, right: 16, height: 5, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+          {(storiesList || []).map((_, i) => {
+            if (i < currentIndex) {
+              return <View key={String(i)} style={{ flex: 1, height: 5, marginHorizontal: 2, backgroundColor: '#fff', borderRadius: 999 }} />;
+            }
+
+            if (i > currentIndex) {
+              return <View key={String(i)} style={{ flex: 1, height: 5, marginHorizontal: 2, backgroundColor: '#ffffff33', borderRadius: 999 }} />;
+            }
+
+            return (
+              <View key={String(i)} style={{ flex: 1, height: 5, marginHorizontal: 2, backgroundColor: '#ffffff33', borderRadius: 999, overflow: 'hidden' }}>
+                  <View style={{ width: progressWidth, height: 5, backgroundColor: '#fff', borderRadius: 999 }} />
+              </View>
+            );
+          })}
+        </View>
+
+        <View style={{ position: 'absolute', bottom: 34, left: 20, right: 20, alignItems: 'center', gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: 'rgba(17,17,17,0.55)', borderRadius: 18 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="eye-outline" size={18} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 13 }}>{viewCount ?? story?.total_views ?? 0}</Text>
+            </View>
+            <Text style={{ color: '#fff', opacity: 0.85 }}>{String(currentIndex + 1)} / {storiesList?.length || 0}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Pressable onPress={toggleSeen} style={{ paddingVertical: 4, paddingHorizontal: 10, backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 999 }}>
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{seenStoryIdsRef.current[String(story?.id)] ? 'Mark Unviewed' : 'Mark Viewed'}</Text>
+              </Pressable>
+              <Pressable onPress={onShare} style={{ padding: 6 }}>
+                <Ionicons name="share-social-outline" size={20} color="#fff" />
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+});
 
 function SpecialOfferStrip() {
   return (
@@ -1629,6 +2055,8 @@ export default function HomeScreen({ onLogout }) {
   const [dealCards, setDealCards]       = useState([]);
   const [popularStores, setPopularStores] = useState([]);
   const [nearbyStores, setNearbyStores]   = useState([]);
+  const [stories, setStories]             = useState([]);
+  const [sectionsConfig, setSectionsConfig] = useState([]);
   const [interestMatchedStores, setInterestMatchedStores] = useState([]);
   const [serviceability, setServiceability] = useState({ in_service_area: true, service_area_name: 'Pondicherry', areas: [] });
   const serviceabilityAlertShownRef = useRef(false);
@@ -1637,6 +2065,54 @@ export default function HomeScreen({ onLogout }) {
   const [wishlistItems, setWishlistItems] = useState([]);
   const [wishlistHistory, setWishlistHistory] = useState([]);
   const [wishlistMap, setWishlistMap] = useState({});
+  const [seenStoryIds, setSeenStoryIds] = useState({});
+  const [storyViewerId, setStoryViewerId] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [storedSeenIds, storedViewerId] = await Promise.all([
+          AsyncStorage.getItem(STORY_SEEN_IDS_KEY),
+          AsyncStorage.getItem(STORY_VIEWER_ID_KEY),
+        ]);
+
+        if (storedSeenIds) {
+          const parsed = JSON.parse(storedSeenIds);
+          if (Array.isArray(parsed)) {
+            const next = {};
+            parsed.forEach((id) => {
+              next[String(id)] = true;
+            });
+            setSeenStoryIds(next);
+          }
+        }
+
+        if (storedViewerId) {
+          setStoryViewerId(storedViewerId);
+        } else {
+          const generatedViewerId = `viewer_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+          await AsyncStorage.setItem(STORY_VIEWER_ID_KEY, generatedViewerId);
+          setStoryViewerId(generatedViewerId);
+        }
+      } catch (_) {
+        // keep story state non-blocking in offline/storage failure cases
+      }
+    })();
+  }, []);
+
+  const setStorySeen = useCallback((storyId, seen) => {
+    const normalizedId = String(storyId);
+    setSeenStoryIds((prev) => {
+      const next = { ...prev };
+      if (seen) {
+        next[normalizedId] = true;
+      } else {
+        delete next[normalizedId];
+      }
+      AsyncStorage.setItem(STORY_SEEN_IDS_KEY, JSON.stringify(Object.keys(next))).catch(() => {});
+      return next;
+    });
+  }, []);
 
   const normalizeWishlistItems = useCallback((rows = []) => {
     return rows.map((row) => {
@@ -1723,6 +2199,63 @@ export default function HomeScreen({ onLogout }) {
       distance_km: store?.distKm ?? null,
     });
   }, [logOfferEvent]);
+
+  const isStoriesVisible = sectionsConfig.length === 0
+    ? true
+    : sectionsConfig.find((s) => s.key === 'stories')?.visible !== false;
+
+  const [storyModalVisible, setStoryModalVisible] = useState(false);
+  const [storyModalStoryId, setStoryModalStoryId] = useState(null);
+  const [storyViewerStories, setStoryViewerStories] = useState([]);
+  const closeStoryViewer = useCallback(() => {
+    setStoryModalVisible(false);
+    setStoryViewerStories([]);
+  }, []);
+
+  const allStoresForLinks = Array.from(
+    new Map(
+      [...popularStores, ...nearbyStores, ...interestMatchedStores]
+        .filter((s) => s?.id != null)
+        .map((s) => [String(s.id), s])
+    ).values()
+  );
+
+  const openStory = useCallback((story) => {
+    if (!story) return;
+    if (story.media_url) {
+      if (story.media_type === 'image') {
+        const snapshot = stories.map((s) => ({ ...s }));
+        setStoryViewerStories(snapshot);
+        setStoryModalStoryId(String(story.id));
+        setStoryModalVisible(true);
+        return;
+      }
+      if (story.media_type === 'video') {
+        const snapshot = stories.map((s) => ({ ...s }));
+        setStoryViewerStories(snapshot);
+        setStoryModalStoryId(String(story.id));
+        setStoryModalVisible(true);
+        return;
+      }
+    }
+    if (story.link_type === 'store' && story.link_id != null) {
+      const linked = allStoresForLinks.find((s) => String(s.id) === String(story.link_id));
+      if (linked) {
+        openStore(linked, 'story-store');
+      }
+      return;
+    }
+
+    if (story.link_type === 'banner' && story.link_id != null) {
+      const banner = banners.find((b) => String(b.id) === String(story.link_id));
+      if (!banner) return;
+      if ((banner.linked_stores || []).length === 1) {
+        openStore(banner.linked_stores[0], 'story-banner');
+      } else if ((banner.linked_stores || []).length > 1) {
+        setBannerStorePicker(banner);
+      }
+    }
+  }, [allStoresForLinks, banners, openStore]);
 
   const applyHomeData = (data, lat, lng) => {
     const incomingServiceability = data?.serviceability || {};
@@ -1835,6 +2368,17 @@ export default function HomeScreen({ onLogout }) {
     } else {
       setPopularStores([]);
       setNearbyStores([]);
+    }
+
+    if (Array.isArray(data.stories)) {
+      setStories(data.stories.filter(s => s.is_active !== false));
+    } else {
+      setStories([]);
+    }
+    if (Array.isArray(data.sections_config)) {
+      setSectionsConfig(data.sections_config);
+    } else {
+      setSectionsConfig([]);
     }
   };
 
@@ -2038,6 +2582,16 @@ export default function HomeScreen({ onLogout }) {
           />
         }
       >
+        {/* Story media viewer modal */}
+        <StoryViewer
+          visible={storyModalVisible}
+          storiesList={storyViewerStories}
+          index={storyModalStoryId}
+          onClose={closeStoryViewer}
+          viewerId={storyViewerId}
+          seenStoryIds={seenStoryIds}
+          onSetStorySeen={setStorySeen}
+        />
         {showNotServiceable ? (
           <View style={styles.notServiceableCard}>
             <Text style={styles.notServiceableEmoji}>📍</Text>
@@ -2061,6 +2615,9 @@ export default function HomeScreen({ onLogout }) {
           </View>
         ) : (
           <>
+        {/* Stories Row */}
+        {isStoriesVisible && <StoryRow stories={stories} onStoryPress={openStory} seenStoryIds={seenStoryIds} />}
+
         {/* Greeting Strip */}
         <LinearGradient
           colors={['#ede9fe', '#fce7f3']}
@@ -2094,128 +2651,375 @@ export default function HomeScreen({ onLogout }) {
           </ScrollView>
         </View>
 
-        {/* Deal of the Day Banner */}
-        <SectionHeader title="Deal of the Day" subtitle="Based on your Interest" accent />
-        <BannerSlider
-          banners={banners}
-          onOpenStore={(store) => openStore(store, 'banner-direct')}
-          onOpenMultipleStores={(banner) => setBannerStorePicker(banner)}
-        />
+        {/* Dynamic Sections — order controlled from Home Layout admin */}
+        {(() => {
+          const DEFAULT_KEYS = ['banners', 'flash_deals', 'deal_cards', 'popular_stores', 'nearby_stores'];
+          const uniqueStorePool = Array.from(
+            new Map(
+              [...popularStores, ...nearbyStores, ...interestMatchedStores]
+                .filter((s) => s?.id != null)
+                .map((s) => [String(s.id), s])
+            ).values()
+          );
 
-        {/* Special Offer Strip */}
-        <SpecialOfferStrip />
+          const customSections = sectionsConfig
+            .filter((s) => s?.type === 'custom' && s?.visible !== false);
 
-        {/* Flash Deals */}
-        <SectionHeader title="⚡ Flash Deals" subtitle={`Ends in ${countdown}`} accent />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 14, gap: 12, paddingBottom: 4 }}>
-          {flashDeals.map((item) => (
-            <FlashDealCard
-              key={item.id}
-              item={item}
-              countdown={countdown}
-              isSaved={!!wishlistMap[`flash_deal:${item.id}`]}
-              onToggleWishlist={toggleWishlist}
-              onOpen={(deal) => {
-                haptic();
-                logOfferEvent('flash_deal', Number(deal.id), 'viewed', { source: 'home-flash' });
-              }}
-            />
-          ))}
-        </ScrollView>
+          const cfgByKey = Object.fromEntries((sectionsConfig || []).map((s) => [s.key, s]));
+          const getSectionHeading = (key, fallbackTitle, fallbackSubtitle = null) => {
+            const cfg = cfgByKey[key] || {};
+            const title = String(cfg.label || fallbackTitle || '').trim() || fallbackTitle;
+            const subtitle = cfg.subtitle == null || String(cfg.subtitle).trim() === ''
+              ? fallbackSubtitle
+              : String(cfg.subtitle);
+            return { title, subtitle };
+          };
 
-        {/* Featured Deals */}
-        <SectionHeader title="Featured Deals" subtitle="Offers You Will Love" accent />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 14, gap: 12, paddingBottom: 4 }}>
-          {dealCards.map((deal) => (
-            <DealCard
-              key={deal.id}
-              deal={deal}
-              isSaved={!!wishlistMap[`deal_card:${deal.id}`]}
-              onToggleWishlist={toggleWishlist}
-              onOpen={(card) => {
-                haptic();
-                logOfferEvent('deal_card', Number(card.id), 'viewed', { source: 'home-featured' });
-              }}
-            />
-          ))}
-        </ScrollView>
+          const matchesCustomSection = (store, section) => {
+            const by = String(section?.filter?.by || '').toLowerCase();
+            const needle = String(section?.filter?.value || '').trim().toLowerCase();
+            if (!needle) return false;
+            if (by === 'category') return String(store?.category || '').toLowerCase().includes(needle);
+            if (by === 'tag') return String(store?.tag || '').toLowerCase().includes(needle);
+            if (by === 'interest') return (store?.interests || []).some((i) => String(i).toLowerCase().includes(needle));
+            return false;
+          };
 
-        {/* Interest Matched Stores */}
-        {interestMatchedStores.length > 0 && (
-          <>
-            <SectionHeader title="Based on Your Interests" subtitle="Stores matching your preferences" accent />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 14, gap: 14, paddingBottom: 4 }}>
-              {interestMatchedStores.map((s) => (
-                <PopularCard
-                  key={`interest-${s.id}`}
-                  store={s}
-                  onPress={() => openStore(s, 'interest-matched')}
-                  isSaved={!!wishlistMap[`store:${s.id}`]}
-                  onToggleWishlist={toggleWishlist}
+          const renderCustomSection = (section) => {
+            if (section?.mode === 'link') {
+              const targetType = String(section?.link?.target_type || 'store');
+              const ids = Array.isArray(section?.link?.target_ids)
+                ? section.link.target_ids.map((id) => String(id))
+                : [];
+              if (!ids.length) return null;
+
+              if (targetType === 'store') {
+                const linkedStores = uniqueStorePool.filter((s) => ids.includes(String(s.id)));
+                if (!linkedStores.length) return null;
+                return (
+                  <React.Fragment key={section.key}>
+                    <SectionHeader
+                      title={section.label || 'Custom Stores'}
+                      subtitle={section.subtitle || `Linked stores (${linkedStores.length})`}
+                      accent
+                    />
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ paddingHorizontal: 14, gap: 14, paddingBottom: 4 }}>
+                      {linkedStores.map((s) => (
+                        <PopularCard
+                          key={`${section.key}-${s.id}`}
+                          store={s}
+                          onPress={() => openStore(s, `custom-link-${section.key}`)}
+                          isSaved={!!wishlistMap[`store:${s.id}`]}
+                          onToggleWishlist={toggleWishlist}
+                        />
+                      ))}
+                    </ScrollView>
+                  </React.Fragment>
+                );
+              }
+
+              if (targetType === 'banner') {
+                const linkedBanners = banners.filter((b) => ids.includes(String(b.id)));
+                if (!linkedBanners.length) return null;
+                return (
+                  <React.Fragment key={section.key}>
+                    <SectionHeader
+                      title={section.label || 'Custom Banner Section'}
+                      subtitle={section.subtitle || null}
+                      accent
+                    />
+                    <BannerSlider
+                      banners={linkedBanners}
+                      onOpenStore={(store) => openStore(store, `custom-banner-${section.key}`)}
+                      onOpenMultipleStores={(banner) => setBannerStorePicker(banner)}
+                    />
+                  </React.Fragment>
+                );
+              }
+
+              if (targetType === 'story') {
+                const linkedStories = (stories || []).filter((st) => ids.includes(String(st.id)));
+                if (!linkedStories.length) return null;
+                return (
+                  <React.Fragment key={section.key}>
+                    <SectionHeader
+                      title={section.label || 'Custom Stories'}
+                      subtitle={section.subtitle || null}
+                      accent
+                    />
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ paddingHorizontal: 14, gap: 14, paddingBottom: 4 }}>
+                      {linkedStories.map((st) => (
+                        <Pressable key={`custom-story-${st.id}`} onPress={() => openStory(st)} style={{ alignItems: 'center' }}>
+                          <View style={{ width: 64, height: 64, borderRadius: 32, overflow: 'hidden', backgroundColor: st.bg_color || '#7b2fcd', justifyContent: 'center', alignItems: 'center' }}>
+                            {st.image_url ? (
+                              <Image source={{ uri: st.image_url }} style={{ width: 64, height: 64 }} resizeMode="cover" />
+                            ) : (
+                              <Text style={{ fontSize: 24 }}>{st.emoji || '⭐'}</Text>
+                            )}
+                          </View>
+                          <Text style={{ fontSize: 11, marginTop: 6 }}>{st.title}</Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </React.Fragment>
+                );
+              }
+
+              if (targetType === 'flash_deal') {
+                const linkedFlashDeals = flashDeals.filter((d) => ids.includes(String(d.id)));
+                if (!linkedFlashDeals.length) return null;
+                return (
+                  <React.Fragment key={section.key}>
+                    <SectionHeader
+                      title={section.label || 'Custom Flash Deals'}
+                      subtitle={section.subtitle || `Ends in ${countdown}`}
+                      accent
+                    />
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ paddingHorizontal: 14, gap: 12, paddingBottom: 4 }}>
+                      {linkedFlashDeals.map((item) => (
+                        <FlashDealCard
+                          key={`${section.key}-${item.id}`}
+                          item={item}
+                          countdown={countdown}
+                          isSaved={!!wishlistMap[`flash_deal:${item.id}`]}
+                          onToggleWishlist={toggleWishlist}
+                          onOpen={(deal) => {
+                            haptic();
+                            logOfferEvent('flash_deal', Number(deal.id), 'viewed', { source: `custom-flash-${section.key}` });
+                          }}
+                        />
+                      ))}
+                    </ScrollView>
+                  </React.Fragment>
+                );
+              }
+
+              if (targetType === 'deal_card') {
+                const linkedCards = dealCards.filter((d) => ids.includes(String(d.id)));
+                if (!linkedCards.length) return null;
+                return (
+                  <React.Fragment key={section.key}>
+                    <SectionHeader
+                      title={section.label || 'Custom Deal Cards'}
+                      subtitle={section.subtitle || null}
+                      accent
+                    />
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ paddingHorizontal: 14, gap: 12, paddingBottom: 4 }}>
+                      {linkedCards.map((deal) => (
+                        <DealCard
+                          key={`${section.key}-${deal.id}`}
+                          deal={deal}
+                          isSaved={!!wishlistMap[`deal_card:${deal.id}`]}
+                          onToggleWishlist={toggleWishlist}
+                          onOpen={(card) => {
+                            haptic();
+                            logOfferEvent('deal_card', Number(card.id), 'viewed', { source: `custom-card-${section.key}` });
+                          }}
+                        />
+                      ))}
+                    </ScrollView>
+                  </React.Fragment>
+                );
+              }
+
+              return null;
+            }
+
+            const filtered = uniqueStorePool.filter((s) => matchesCustomSection(s, section));
+            if (!filtered.length) return null;
+            return (
+              <React.Fragment key={section.key}>
+                <SectionHeader
+                  title={section.label || 'Custom Stores'}
+                  subtitle={section.subtitle || `Filtered by ${section?.filter?.by || 'rule'}`}
+                  accent
                 />
-              ))}
-            </ScrollView>
-          </>
-        )}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 14, gap: 14, paddingBottom: 4 }}>
+                  {filtered.map((s) => (
+                    <PopularCard
+                      key={`${section.key}-${s.id}`}
+                      store={s}
+                      onPress={() => openStore(s, `custom-${section.key}`)}
+                      isSaved={!!wishlistMap[`store:${s.id}`]}
+                      onToggleWishlist={toggleWishlist}
+                    />
+                  ))}
+                </ScrollView>
+              </React.Fragment>
+            );
+          };
 
-        {/* Need More Deals – meal tag filter */}
-        <View style={[styles.moreDealsSection, { backgroundColor: themeColors.mealSection }]}>
-          <Text style={[styles.moreDealsTitle, { color: themeColors.mealTitle }]}>Need more deals on Monday?</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8 }}>
-            {MEAL_TAGS.map((t) => (
-              <Pressable
-                key={t.id}
-                onPress={() => setActiveMealTag(t.id)}
-                style={[
-                  styles.mealTag,
-                  { backgroundColor: themeColors.mealTagBg, borderColor: themeColors.mealTagBorder },
-                  activeMealTag === t.id && styles.mealTagActive,
-                ]}
-              >
-                <Text style={[
-                  styles.mealTagText,
-                  { color: themeColors.mealTagText },
-                  activeMealTag === t.id && styles.mealTagTextActive,
-                ]}>
-                  {t.label}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
+          const orderedKeys = sectionsConfig.length > 0
+            ? sectionsConfig
+                .filter(s => s.visible !== false && s.key !== 'stories')
+                .sort((a, b) => a.order - b.order)
+                .map(s => s.key)
+            : DEFAULT_KEYS;
 
-        {/* Popular in City */}
-        <SectionHeader title="Popular in City" subtitle="Top rated stores near you" accent />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 14, gap: 14, paddingBottom: 4 }}>
-          {popularStores.map((s) => (
-            <PopularCard
-              key={s.id}
-              store={s}
-              onPress={() => openStore(s, 'popular')}
-              isSaved={!!wishlistMap[`store:${s.id}`]}
-              onToggleWishlist={toggleWishlist}
-            />
-          ))}
-        </ScrollView>
+          const sectionMap = {
+            banners: (
+              <React.Fragment key="banners">
+                {banners.length > 0 && (
+                  <>
+                    {(() => {
+                      const heading = getSectionHeading('banners', 'Deal of the Day', 'Based on your Interest');
+                      return <SectionHeader title={heading.title} subtitle={heading.subtitle} accent />;
+                    })()}
+                    <BannerSlider
+                      banners={banners}
+                      onOpenStore={(store) => openStore(store, 'banner-direct')}
+                      onOpenMultipleStores={(banner) => setBannerStorePicker(banner)}
+                    />
+                  </>
+                )}
+                <SpecialOfferStrip />
+              </React.Fragment>
+            ),
+            flash_deals: flashDeals.length > 0 ? (
+              <React.Fragment key="flash_deals">
+                {(() => {
+                  const heading = getSectionHeading('flash_deals', '⚡ Flash Deals', `Ends in ${countdown}`);
+                  return <SectionHeader title={heading.title} subtitle={heading.subtitle} accent />;
+                })()}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 14, gap: 12, paddingBottom: 4 }}>
+                  {flashDeals.map((item) => (
+                    <FlashDealCard
+                      key={item.id}
+                      item={item}
+                      countdown={countdown}
+                      isSaved={!!wishlistMap[`flash_deal:${item.id}`]}
+                      onToggleWishlist={toggleWishlist}
+                      onOpen={(deal) => {
+                        haptic();
+                        logOfferEvent('flash_deal', Number(deal.id), 'viewed', { source: 'home-flash' });
+                      }}
+                    />
+                  ))}
+                </ScrollView>
+              </React.Fragment>
+            ) : null,
+            deal_cards: (
+              <React.Fragment key="deal_cards">
+                {dealCards.length > 0 && (
+                  <>
+                    {(() => {
+                      const heading = getSectionHeading('deal_cards', 'Featured Deals', 'Offers You Will Love');
+                      return <SectionHeader title={heading.title} subtitle={heading.subtitle} accent />;
+                    })()}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ paddingHorizontal: 14, gap: 12, paddingBottom: 4 }}>
+                      {dealCards.map((deal) => (
+                        <DealCard
+                          key={deal.id}
+                          deal={deal}
+                          isSaved={!!wishlistMap[`deal_card:${deal.id}`]}
+                          onToggleWishlist={toggleWishlist}
+                          onOpen={(card) => {
+                            haptic();
+                            logOfferEvent('deal_card', Number(card.id), 'viewed', { source: 'home-featured' });
+                          }}
+                        />
+                      ))}
+                    </ScrollView>
+                  </>
+                )}
+                {interestMatchedStores.length > 0 && (
+                  <>
+                    <SectionHeader title="Based on Your Interests" subtitle="Stores matching your preferences" accent />
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ paddingHorizontal: 14, gap: 14, paddingBottom: 4 }}>
+                      {interestMatchedStores.map((s) => (
+                        <PopularCard
+                          key={`interest-${s.id}`}
+                          store={s}
+                          onPress={() => openStore(s, 'interest-matched')}
+                          isSaved={!!wishlistMap[`store:${s.id}`]}
+                          onToggleWishlist={toggleWishlist}
+                        />
+                      ))}
+                    </ScrollView>
+                  </>
+                )}
+                <View style={[styles.moreDealsSection, { backgroundColor: themeColors.mealSection }]}>
+                  <Text style={[styles.moreDealsTitle, { color: themeColors.mealTitle }]}>Need more deals on Monday?</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ gap: 8 }}>
+                    {MEAL_TAGS.map((t) => (
+                      <Pressable
+                        key={t.id}
+                        onPress={() => setActiveMealTag(t.id)}
+                        style={[
+                          styles.mealTag,
+                          { backgroundColor: themeColors.mealTagBg, borderColor: themeColors.mealTagBorder },
+                          activeMealTag === t.id && styles.mealTagActive,
+                        ]}
+                      >
+                        <Text style={[
+                          styles.mealTagText,
+                          { color: themeColors.mealTagText },
+                          activeMealTag === t.id && styles.mealTagTextActive,
+                        ]}>
+                          {t.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              </React.Fragment>
+            ),
+            popular_stores: popularStores.length > 0 ? (
+              <React.Fragment key="popular_stores">
+                {(() => {
+                  const heading = getSectionHeading('popular_stores', 'Popular in City', 'Top rated stores near you');
+                  return <SectionHeader title={heading.title} subtitle={heading.subtitle} accent />;
+                })()}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 14, gap: 14, paddingBottom: 4 }}>
+                  {popularStores.map((s) => (
+                    <PopularCard
+                      key={s.id}
+                      store={s}
+                      onPress={() => openStore(s, 'popular')}
+                      isSaved={!!wishlistMap[`store:${s.id}`]}
+                      onToggleWishlist={toggleWishlist}
+                    />
+                  ))}
+                </ScrollView>
+              </React.Fragment>
+            ) : null,
+            nearby_stores: nearbyStores.length > 0 ? (
+              <React.Fragment key="nearby_stores">
+                {(() => {
+                  const heading = getSectionHeading('nearby_stores', 'Close to you', 'Within 5 Km');
+                  return <SectionHeader title={heading.title} subtitle={heading.subtitle} accent />;
+                })()}
+                <View style={styles.nearbyGrid}>
+                  {nearbyStores.map((s) => (
+                    <NearbyCard
+                      key={s.id}
+                      store={s}
+                      onPress={() => openStore(s, 'nearby')}
+                      isSaved={!!wishlistMap[`store:${s.id}`]}
+                      onToggleWishlist={toggleWishlist}
+                    />
+                  ))}
+                </View>
+              </React.Fragment>
+            ) : null,
+          };
 
-        {/* Close to You */}
-        <SectionHeader title="Close to you" subtitle="Within 5 Km" accent />
-        <View style={styles.nearbyGrid}>
-          {nearbyStores.map((s) => (
-            <NearbyCard
-              key={s.id}
-              store={s}
-              onPress={() => openStore(s, 'nearby')}
-              isSaved={!!wishlistMap[`store:${s.id}`]}
-              onToggleWishlist={toggleWishlist}
-            />
-          ))}
-        </View>
+          customSections.forEach((section) => {
+            sectionMap[section.key] = renderCustomSection(section);
+          });
+
+          return orderedKeys.map(key => sectionMap[key] ?? null);
+        })()}
 
         {/* Footer */}
         <LinearGradient colors={['#f0e9ff', '#fce4ec']} style={styles.footerWrap}>

@@ -21,7 +21,8 @@
         {
           "locationWhenInUsePermission": "Allow Topdelz to use your location to show nearby stores and deals."
         }
-      ]
+      ],
+      "expo-video"
     ],
     "ios": {
       "supportsTablet": true,
