@@ -2426,6 +2426,7 @@ export default function HomeScreen({ onLogout }) {
 
       // Get an immediate fix first so the UI isn't blank
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      console.log('DEBUG: initial GPS fix', pos?.coords || pos);
       await handleNewPosition(pos);
       setLocLoading(false);
 
@@ -2433,7 +2434,10 @@ export default function HomeScreen({ onLogout }) {
       if (watcherRef.current) watcherRef.current.remove();
       watcherRef.current = await Location.watchPositionAsync(
         { accuracy: Location.Accuracy.Balanced, distanceInterval: 50, timeInterval: 30000 },
-        (newPos) => handleNewPosition(newPos)
+        (newPos) => {
+          console.log('DEBUG: location watcher update', newPos?.coords || newPos);
+          handleNewPosition(newPos);
+        }
       );
     } catch (_) {
       // If GPS fails, still try loading via backend fallback coordinates.

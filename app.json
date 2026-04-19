@@ -4,7 +4,7 @@
     "slug": "offer",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/topdelz-icon.png",
     "userInterfaceStyle": "light",
     "plugins": [
       [
@@ -45,14 +45,14 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/topdelz-foreground.png",
+        "backgroundImage": "./assets/topdelz-background.png",
+        "monochromeImage": "./assets/topdelz-monochrome.png"
       },
       "package": "com.anonymous.offer"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/topdelz-favicon.png"
     }
   }
 }
