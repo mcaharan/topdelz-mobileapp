@@ -36,6 +36,9 @@
             },
             "127.0.0.1": {
               "NSExceptionAllowsInsecureHTTPLoads": true
+            },
+            "10.0.2.2": {
+              "NSExceptionAllowsInsecureHTTPLoads": true
             }
           }
         }
