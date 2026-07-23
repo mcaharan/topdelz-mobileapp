@@ -324,7 +324,8 @@ export default function App() {
   const [showInterestsScreen, setShowInterestsScreen] = useState(false);
   const [showHomeScreen, setShowHomeScreen] = useState(false);
   const [mobileNumber, setMobileNumber] = useState('');
-  const [prefillOtp, setPrefillOtp] = useState('');
+  const [user, setUser] = useState(null);
+  const [reverifyMode, setReverifyMode] = useState(false);
   const lastBackPressRef = useRef(0);
 
   const navigateTo = (screen) => {
@@ -356,6 +357,7 @@ export default function App() {
         try {
           const data = await getProfile();
           const user = data.user;
+          setUser(user);
           if (user?.user_type && user?.interests_count > 0) {
             navigateTo('home');
           } else {
@@ -431,14 +433,24 @@ export default function App() {
 
   const handleLogout = () => {
     setMobileNumber('');
-    setPrefillOtp('');
+    setUser(null);
+    setReverifyMode(false);
     navigateTo('login');
+  };
+
+  const openVerifyPhone = () => {
+    setReverifyMode(true);
+    navigateTo('otp');
   };
 
   if (showHomeScreen) {
     return (
       <FadeScreen slideFrom="right">
-        <HomeScreen onLogout={handleLogout} />
+        <HomeScreen
+          onLogout={handleLogout}
+          phoneVerified={user?.phone_verified === true}
+          onVerifyPhone={openVerifyPhone}
+        />
       </FadeScreen>
     );
   }
@@ -462,13 +474,29 @@ export default function App() {
   if (showOtpScreen) {
     return (
       <FadeScreen slideFrom="right">
-        <OtpScreen mobileNumber={mobileNumber} prefillOtp={prefillOtp} onVerified={(user) => {
-          if (user?.user_type && user?.interests_count > 0) {
-            navigateTo('home');
-          } else {
-            navigateTo('userType');
-          }
-        }} />
+        <OtpScreen
+          mobileNumber={mobileNumber}
+          allowSkip={true}
+          onVerified={(verifiedUser) => {
+            setUser(verifiedUser);
+            if (reverifyMode) {
+              navigateTo('home');
+            } else if (verifiedUser?.user_type && verifiedUser?.interests_count > 0) {
+              navigateTo('home');
+            } else {
+              navigateTo('userType');
+            }
+          }}
+          onSkip={() => {
+            if (reverifyMode) {
+              navigateTo('home');
+            } else if (user?.user_type && user?.interests_count > 0) {
+              navigateTo('home');
+            } else {
+              navigateTo('userType');
+            }
+          }}
+        />
       </FadeScreen>
     );
   }
@@ -476,7 +504,12 @@ export default function App() {
   return (
     <FadeScreen slideFrom="bottom">
       <LoginScreen
-        onOtpSent={(mobile, otp) => { setMobileNumber(mobile); setPrefillOtp(otp || ''); navigateTo('otp'); }}
+        onLoggedIn={(mobile, loggedInUser) => {
+          setMobileNumber(mobile);
+          setUser(loggedInUser);
+          setReverifyMode(false);
+          navigateTo('otp');
+        }}
         onGuestLogin={() => navigateTo('home')}
       />
     </FadeScreen>

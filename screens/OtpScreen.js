@@ -37,20 +37,14 @@ const progStyles = StyleSheet.create({
   fill: { height: 5, backgroundColor: '#7b2fcd', borderRadius: 3 },
 });
 
-export default function OtpScreen({ mobileNumber, prefillOtp, onVerified }) {
+export default function OtpScreen({ mobileNumber, allowSkip, onVerified, onSkip }) {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const inputs = useRef([]);
-  const [resendTimer, setResendTimer] = useState(30);
-  const [canResend, setCanResend] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+  const [canResend, setCanResend] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // Auto-fill OTP boxes when a prefill value is provided (dev mode)
-  useEffect(() => {
-    if (prefillOtp && prefillOtp.length === 6) {
-      setOtp(prefillOtp.split(''));
-    }
-  }, [prefillOtp]);
 
   useEffect(() => {
     if (resendTimer <= 0) { setCanResend(true); return; }
@@ -102,13 +96,19 @@ export default function OtpScreen({ mobileNumber, prefillOtp, onVerified }) {
   const handleResend = async () => {
     if (!canResend) return;
     haptic();
-    setResendTimer(30);
-    setCanResend(false);
     setError('');
     try {
-      await sendOtp(mobileNumber);
-    } catch {
-      Alert.alert('Error', 'Failed to resend OTP.');
+      const data = await sendOtp(mobileNumber);
+      if (data.success) {
+        setSent(true);
+        setResendTimer(30);
+        setCanResend(false);
+      } else {
+        Alert.alert('Error', data.message || 'Failed to send OTP.');
+      }
+    } catch (err) {
+      const msg = err?.response?.data?.message || 'Failed to send OTP.';
+      Alert.alert('Error', msg);
     }
   };
 
@@ -179,12 +179,20 @@ export default function OtpScreen({ mobileNumber, prefillOtp, onVerified }) {
           disabled={!canResend}
           onPress={handleResend}
         >
-          {canResend ? (
+          {!sent ? (
+            <Text style={[styles.resendText, { color: '#7b2fcd', fontFamily: 'Nunito_700Bold' }]}>Send OTP</Text>
+          ) : canResend ? (
             <Text style={[styles.resendText, { color: '#7b2fcd', fontFamily: 'Nunito_700Bold' }]}>Resend OTP</Text>
           ) : (
             <Text style={styles.resendText}>Resend OTP in {resendTimer}s</Text>
           )}
         </Pressable>
+
+        {allowSkip && (
+          <Pressable style={styles.skipWrap} onPress={() => { haptic(); onSkip?.(); }}>
+            <Text style={styles.skipText}>Skip for now</Text>
+          </Pressable>
+        )}
       </KeyboardAvoidingView>
 
       {/* Footer */}
@@ -287,6 +295,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'Nunito_600SemiBold',
     color: '#888888',
+  },
+
+  skipWrap: { alignItems: 'center', paddingVertical: 10 },
+  skipText: {
+    fontSize: 14,
+    fontFamily: 'Nunito_600SemiBold',
+    color: '#aaaaaa',
+    textDecorationLine: 'underline',
   },
 
   footer: {

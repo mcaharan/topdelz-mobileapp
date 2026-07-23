@@ -2028,7 +2028,7 @@ function WalkthroughOverlay({ onDone }) {
 }
 
 /* ─── Main Screen ───────────────────────────────────────── */
-export default function HomeScreen({ onLogout }) {
+export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
   const [activeTab, setActiveTab] = useState('home');
   const [activeCategory, setActiveCategory] = useState('dine');
   const [activeMealTag, setActiveMealTag] = useState('all');
@@ -2529,6 +2529,14 @@ export default function HomeScreen({ onLogout }) {
           </Pressable>
         </View>
       </LinearGradient>
+
+      {/* ── Verify phone reminder ── */}
+      {phoneVerified === false && (
+        <Pressable style={styles.verifyBanner} onPress={() => { haptic(); onVerifyPhone?.(); }}>
+          <Text style={styles.verifyBannerText}>⚠️ Verify your phone number</Text>
+          <Text style={styles.verifyBannerArrow}>›</Text>
+        </Pressable>
+      )}
 
       {/* ── Search (floats below gradient) ── */}
       {activeTab !== 'profile' && activeTab !== 'wishlist' && activeTab !== 'explore' && activeTab !== 'offers' && (
@@ -3063,6 +3071,18 @@ export default function HomeScreen({ onLogout }) {
 /* ─── Styles ─────────────────────────────────────────────── */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f2f2f7' },
+  verifyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fef3c7',
+    borderBottomWidth: 1,
+    borderBottomColor: '#fde68a',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  verifyBannerText: { fontSize: 13, fontFamily: 'Nunito_700Bold', color: '#92400e' },
+  verifyBannerArrow: { fontSize: 18, color: '#92400e' },
   notServiceableCard: {
     marginHorizontal: 14,
     marginTop: 24,

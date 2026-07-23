@@ -33,6 +33,13 @@ api.interceptors.request.use(async (config) => {
 /* ─── Auth endpoints ─────────────────────────────────────── */
 
 /**
+ * Log in (or create) a user by mobile number alone, without OTP.
+ * @param {string} mobile  10-digit mobile number
+ */
+export const loginWithMobile = (mobile) =>
+  api.post('/login', { mobile }).then((r) => r.data);
+
+/**
  * Request an OTP for the given mobile number.
  * @param {string} mobile  10-digit mobile number
  */

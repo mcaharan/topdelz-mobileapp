@@ -14,11 +14,12 @@ import {
   Vibration,
   View,
 } from 'react-native';
-import { sendOtp, API_BASE_URL } from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { loginWithMobile, API_BASE_URL } from '../services/api';
 
 function haptic() { Vibration.vibrate(8); }
 
-export default function LoginScreen({ onOtpSent, onGuestLogin }) {
+export default function LoginScreen({ onLoggedIn, onGuestLogin }) {
   const [mobileNumber, setMobileNumber] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -26,11 +27,13 @@ export default function LoginScreen({ onOtpSent, onGuestLogin }) {
     haptic();
     setLoading(true);
     try {
-      const data = await sendOtp(mobileNumber);
+      const data = await loginWithMobile(mobileNumber);
       if (data.success) {
-        onOtpSent?.(mobileNumber, String(data.otp));
+        await AsyncStorage.setItem('auth_token', data.token);
+        await AsyncStorage.setItem('user', JSON.stringify(data.user));
+        onLoggedIn?.(mobileNumber, data.user);
       } else {
-        Alert.alert('Error', data.message || 'Failed to send OTP.');
+        Alert.alert('Error', data.message || 'Failed to log in.');
       }
     } catch (err) {
       const msg = err?.response?.data?.message || 'Could not reach server. Check your connection.';
