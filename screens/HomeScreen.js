@@ -256,14 +256,22 @@ function useCountdown(endHour = 23, endMin = 59) {
 /* ─── Sub-components ────────────────────────────────────── */
 function CategoryItem({ item, active, onPress }) {
   return (
-    <Pressable style={styles.catItem} onPress={onPress}>
-      <View style={[styles.catIconBox, { backgroundColor: active ? '#7b2fcd' : item.color }]}>
-        <Text style={styles.catEmoji}>{item.emoji}</Text>
-      </View>
-      <Text style={[styles.catLabel, active && { color: '#7b2fcd', fontFamily: 'Nunito_700Bold' }]}>
-        {item.label}
-      </Text>
-      {active && <View style={styles.catActiveDot} />}
+    <Pressable onPress={onPress} activeOpacity={0.8}>
+      {active ? (
+        <LinearGradient
+          colors={['#7b2fcd', '#c03b8f']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={styles.catPillActive}
+        >
+          <Text style={{ fontSize: 15 }}>{item.emoji}</Text>
+          <Text style={styles.catPillLabelActive} numberOfLines={1}>{item.label.replace('\n', ' ')}</Text>
+        </LinearGradient>
+      ) : (
+        <View style={[styles.catPill, { backgroundColor: item.color }]}>
+          <Text style={{ fontSize: 15 }}>{item.emoji}</Text>
+          <Text style={styles.catPillLabel} numberOfLines={1}>{item.label.replace('\n', ' ')}</Text>
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -272,15 +280,12 @@ function SectionHeader({ title, subtitle, accent }) {
   const { colors } = useContext(ThemeContext);
   return (
     <View style={styles.sectionHeader}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        {accent ? <View style={styles.accentBar} /> : null}
-        <View>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
-          {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
-        </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+        {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
       </View>
-      <Pressable>
-        <Text style={styles.viewAll}>View All ›</Text>
+      <Pressable style={styles.viewAllBtn}>
+        <Text style={styles.viewAll}>See all ›</Text>
       </Pressable>
     </View>
   );
@@ -3205,8 +3210,8 @@ const styles = StyleSheet.create({
   filterIcon: { fontSize: 18 },
 
   /* Categories */
-  categorySection: { backgroundColor: '#ffffff', paddingVertical: 8 },
-  categoryRow: { paddingHorizontal: 10, gap: 4 },
+  categorySection: { backgroundColor: '#ffffff', paddingVertical: 10 },
+  categoryRow: { paddingHorizontal: 14, gap: 8 },
   catItem: { alignItems: 'center', width: 72, paddingVertical: 6 },
   catIconBox: {
     width: 58, height: 58, borderRadius: 29,
@@ -3217,6 +3222,22 @@ const styles = StyleSheet.create({
   catLabel: { fontSize: 11, fontFamily: 'Nunito_600SemiBold', color: '#444444', textAlign: 'center', lineHeight: 14 },
   catActiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#7b2fcd', marginTop: 3 },
 
+  /* Category pills (new design) */
+  catPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 14, paddingVertical: 9,
+    borderRadius: 50,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+  },
+  catPillActive: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 14, paddingVertical: 9,
+    borderRadius: 50,
+    shadowColor: '#7b2fcd', shadowOpacity: 0.25, shadowRadius: 6, elevation: 4,
+  },
+  catPillLabel: { fontSize: 13, fontFamily: 'Nunito_600SemiBold', color: '#444444' },
+  catPillLabelActive: { fontSize: 13, fontFamily: 'Nunito_700Bold', color: '#ffffff' },
+
   /* Section headers */
   sectionHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -3226,15 +3247,19 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontFamily: 'Nunito_800ExtraBold', color: '#111111' },
   sectionSubtitle: { fontSize: 11.5, fontFamily: 'Nunito_400Regular', color: '#888888', marginTop: 1 },
   viewAll: { fontSize: 13, fontFamily: 'Nunito_700Bold', color: '#7b2fcd' },
+  viewAllBtn: {
+    backgroundColor: '#f0ebff', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 6,
+  },
 
   /* Hero Banner */
   heroBanner: {
     width: width - 28,
-    borderRadius: 18,
-    padding: 18,
+    borderRadius: 22,
+    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 160,
+    minHeight: 180,
   },
   heroBadge: {
     backgroundColor: 'rgba(255,255,255,0.22)',
@@ -3301,7 +3326,7 @@ const styles = StyleSheet.create({
 
   /* Flash deals */
   flashCard: {
-    width: 140, borderRadius: 16, padding: 14,
+    width: 160, borderRadius: 20, padding: 16,
     alignItems: 'flex-start', gap: 4,
   },
   flashEmoji: { fontSize: 34, marginBottom: 4 },
@@ -3310,6 +3335,12 @@ const styles = StyleSheet.create({
   flashTimerRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
   flashTimerIcon: { fontSize: 11 },
   flashTimer: { fontSize: 12, fontFamily: 'Nunito_700Bold', color: '#ffffff' },
+  flashViewBtn: {
+    marginTop: 8, backgroundColor: 'rgba(255,255,255,0.22)',
+    borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
+    paddingHorizontal: 12, paddingVertical: 7, alignSelf: 'flex-start',
+  },
+  flashViewText: { fontSize: 12, fontFamily: 'Nunito_700Bold', color: '#ffffff' },
 
   /* Featured deal cards */
   dealCard: { width: 155, borderRadius: 16, padding: 16, justifyContent: 'space-between', minHeight: 175 },
@@ -3341,11 +3372,11 @@ const styles = StyleSheet.create({
 
   /* Popular in City */
   popularCard: {
-    width: 148, backgroundColor: '#ffffff', borderRadius: 16,
+    width: 156, backgroundColor: '#ffffff', borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 8, elevation: 3,
+    shadowColor: '#000', shadowOpacity: 0.09, shadowRadius: 10, elevation: 4,
   },
-  popularImgBox: { width: '100%', height: 100, justifyContent: 'center', alignItems: 'center' },
+  popularImgBox: { width: '100%', height: 110, justifyContent: 'center', alignItems: 'center' },
   popularEmoji: { fontSize: 44 },
   closedOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -3375,16 +3406,16 @@ const styles = StyleSheet.create({
   nearbyCard: {
     width: (width - 40) / 2,
     backgroundColor: '#ffffff',
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.09,
+    shadowRadius: 10,
+    elevation: 4,
   },
   nearbyImgBox: {
     width: '100%',
-    height: 100,
+    height: 112,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
