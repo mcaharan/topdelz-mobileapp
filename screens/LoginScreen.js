@@ -14,7 +14,7 @@ import {
   Vibration,
   View,
 } from 'react-native';
-import { sendOtp } from '../services/api';
+import { sendOtp, API_BASE_URL } from '../services/api';
 
 function haptic() { Vibration.vibrate(8); }
 
@@ -68,6 +68,8 @@ export default function LoginScreen({ onOtpSent, onGuestLogin }) {
         <Text style={styles.subtitle}>
           Enter your mobile number we will sent{'\n'}you OTP to verify
         </Text>
+
+        <Text style={styles.apiText}>API: {API_BASE_URL}</Text>
 
         <View style={styles.inputWrapper}>
           <TextInput
@@ -197,6 +199,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'Nunito_600SemiBold',
     color: '#888888',
+  },
+
+  apiText: {
+    fontSize: 12,
+    fontFamily: 'Nunito_400Regular',
+    color: '#555555',
+    marginBottom: 12,
   },
 
   footer: {
