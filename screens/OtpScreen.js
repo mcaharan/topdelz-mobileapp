@@ -1,6 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   ActivityIndicator,
   Alert,
@@ -32,9 +31,9 @@ function ProgressBar({ step, total }) {
 
 const progStyles = StyleSheet.create({
   wrap: { marginBottom: 20 },
-  label: { fontSize: 11, fontFamily: 'Nunito_600SemiBold', color: '#888888', marginBottom: 6 },
-  track: { height: 5, backgroundColor: '#e0e0e0', borderRadius: 3 },
-  fill: { height: 5, backgroundColor: '#7b2fcd', borderRadius: 3 },
+  label: { fontSize: 11, fontFamily: 'Nunito_600SemiBold', color: '#a3a3ad', marginBottom: 6 },
+  track: { height: 4, backgroundColor: '#ececf2', borderRadius: 3 },
+  fill: { height: 4, backgroundColor: '#7b2fcd', borderRadius: 3 },
 });
 
 export default function OtpScreen({ mobileNumber, allowSkip, onVerified, onSkip }) {
@@ -114,91 +113,83 @@ export default function OtpScreen({ mobileNumber, allowSkip, onVerified, onSkip 
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
-      {/* Gradient top band */}
-      <LinearGradient
-        colors={['#7b2fcd', '#c03b8f', '#e8574a']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.gradientStrip}
-      />
-
-      {/* White rounded card */}
       <KeyboardAvoidingView
         style={styles.body}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Logo */}
-        <Image
-          source={require('../assets/logo.png')}
-          style={styles.brandLogo}
-          resizeMode="contain"
-        />
-
-        <ProgressBar step={2} total={3} />
-
-        <Text style={styles.title}>Verification</Text>
-        <Text style={styles.subtitle}>
-          Enter OTP Code Sent to your Mobile Number
-        </Text>
-
-        {/* 6 OTP boxes */}
-        <View style={styles.otpRow}>
-          {otp.map((digit, index) => (
-            <TextInput
-              key={index}
-              ref={(ref) => (inputs.current[index] = ref)}
-              value={digit}
-              onChangeText={(text) => handleChange(text, index)}
-              onKeyPress={(e) => handleKeyPress(e, index)}
-              keyboardType="number-pad"
-              maxLength={1}
-              style={[styles.otpBox, digit ? styles.otpBoxFilled : null]}
-              textAlign="center"
-              selectTextOnFocus
-            />
-          ))}
+        <View style={styles.logoWrap}>
+          <Image
+            source={require('../assets/logo.png')}
+            style={styles.brandLogo}
+            resizeMode="contain"
+          />
         </View>
 
-        <Pressable
-          style={[styles.verifyButton, (!isComplete || loading) && styles.disabledButton]}
-          disabled={!isComplete || loading}
-          onPress={handleVerify}
-        >
-          {loading
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.verifyText}>Verify</Text>
-          }
-        </Pressable>
+        <View style={styles.card}>
+          <ProgressBar step={2} total={3} />
 
-        {!!error && <Text style={styles.errorText}>{error}</Text>}
+          <Text style={styles.title}>Verification</Text>
+          <Text style={styles.subtitle}>
+            Enter the OTP code sent to your mobile number
+          </Text>
 
-        <Pressable
-          style={styles.resendWrap}
-          disabled={!canResend}
-          onPress={handleResend}
-        >
-          {!sent ? (
-            <Text style={[styles.resendText, { color: '#7b2fcd', fontFamily: 'Nunito_700Bold' }]}>Send OTP</Text>
-          ) : canResend ? (
-            <Text style={[styles.resendText, { color: '#7b2fcd', fontFamily: 'Nunito_700Bold' }]}>Resend OTP</Text>
-          ) : (
-            <Text style={styles.resendText}>Resend OTP in {resendTimer}s</Text>
-          )}
-        </Pressable>
+          <View style={styles.otpRow}>
+            {otp.map((digit, index) => (
+              <TextInput
+                key={index}
+                ref={(ref) => (inputs.current[index] = ref)}
+                value={digit}
+                onChangeText={(text) => handleChange(text, index)}
+                onKeyPress={(e) => handleKeyPress(e, index)}
+                keyboardType="number-pad"
+                maxLength={1}
+                style={[styles.otpBox, digit ? styles.otpBoxFilled : null]}
+                textAlign="center"
+                selectTextOnFocus
+              />
+            ))}
+          </View>
 
-        {allowSkip && (
-          <Pressable style={styles.skipWrap} onPress={() => { haptic(); onSkip?.(); }}>
-            <Text style={styles.skipText}>Skip for now</Text>
+          <Pressable
+            style={[styles.primaryButton, (!isComplete || loading) && styles.primaryButtonDisabled]}
+            disabled={!isComplete || loading}
+            onPress={handleVerify}
+          >
+            {loading
+              ? <ActivityIndicator color="#ffffff" />
+              : <Text style={styles.primaryButtonText}>Verify</Text>
+            }
           </Pressable>
-        )}
+
+          {!!error && <Text style={styles.errorText}>{error}</Text>}
+
+          <Pressable
+            style={styles.resendWrap}
+            disabled={!canResend}
+            onPress={handleResend}
+          >
+            {!sent ? (
+              <Text style={[styles.resendText, styles.resendTextActive]}>Send OTP</Text>
+            ) : canResend ? (
+              <Text style={[styles.resendText, styles.resendTextActive]}>Resend OTP</Text>
+            ) : (
+              <Text style={styles.resendText}>Resend OTP in {resendTimer}s</Text>
+            )}
+          </Pressable>
+
+          {allowSkip && (
+            <Pressable style={styles.skipWrap} onPress={() => { haptic(); onSkip?.(); }}>
+              <Text style={styles.skipText}>Skip for now</Text>
+            </Pressable>
+          )}
+        </View>
       </KeyboardAvoidingView>
 
-      {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          By clicking 'Login', 'Signup', you accept our
+          By continuing, you accept our
         </Text>
         <Pressable>
           <Text style={styles.privacyText}>Privacy policy</Text>
@@ -209,99 +200,118 @@ export default function OtpScreen({ mobileNumber, allowSkip, onVerified, onSkip 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#7b2fcd' },
+  container: { flex: 1, backgroundColor: '#f7f7fb' },
 
-  gradientStrip: { height: 110 },
+  body: {
+    flex: 1,
+    paddingHorizontal: 24,
+    justifyContent: 'center',
+  },
+
+  logoWrap: {
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  brandLogo: {
+    width: 180,
+    height: 56,
+  },
+
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#1a1a2e',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
+    elevation: 3,
+  },
 
   errorText: {
     color: '#e53935',
     fontSize: 13,
     fontFamily: 'Nunito_600SemiBold',
     textAlign: 'center',
-    marginTop: 8,
-  },
-
-  body: {
-    flex: 1,
-    backgroundColor: '#ebebeb',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    marginTop: -28,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-
-  brandLogo: {
-    width: 200,
-    height: 62,
-    marginBottom: 32,
+    marginTop: 4,
+    marginBottom: 4,
   },
 
   title: {
-    fontSize: 26,
+    fontSize: 22,
     fontFamily: 'Nunito_800ExtraBold',
-    color: '#111111',
-    marginBottom: 6,
+    color: '#14141a',
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: 'Nunito_400Regular',
-    color: '#888888',
+    color: '#8b8b96',
     lineHeight: 20,
-    marginBottom: 28,
+    marginBottom: 24,
   },
 
   /* 6 individual OTP boxes */
   otpRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 28,
+    marginBottom: 24,
   },
   otpBox: {
-    width: 46,
+    width: 44,
     height: 54,
-    borderRadius: 10,
+    borderRadius: 14,
+    backgroundColor: '#f7f7fb',
     borderWidth: 1.5,
-    borderColor: '#dcdcdc',
-    backgroundColor: '#ffffff',
-    fontSize: 22,
+    borderColor: '#ececf2',
+    fontSize: 20,
     fontFamily: 'Nunito_700Bold',
-    color: '#111111',
+    color: '#14141a',
   },
   otpBoxFilled: {
-    borderColor: '#6b21a8',
+    backgroundColor: '#ffffff',
+    borderColor: '#7b2fcd',
   },
 
-  /* Verify button */
-  verifyButton: {
+  primaryButton: {
     width: '100%',
-    borderRadius: 10,
-    backgroundColor: '#6b21a8',
-    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: '#7b2fcd',
+    paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 6,
+    shadowColor: '#7b2fcd',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 2,
   },
-  disabledButton: {
-    backgroundColor: '#c0c0c0',
+  primaryButtonDisabled: {
+    backgroundColor: '#d8d8e2',
+    shadowOpacity: 0,
+    elevation: 0,
   },
-  verifyText: {
+  primaryButtonText: {
     color: '#ffffff',
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: 'Nunito_700Bold',
   },
 
-  resendWrap: { alignItems: 'center', paddingVertical: 6 },
+  resendWrap: { alignItems: 'center', paddingVertical: 10 },
   resendText: {
-    fontSize: 15,
-    fontFamily: 'Nunito_600SemiBold',
-    color: '#888888',
-  },
-
-  skipWrap: { alignItems: 'center', paddingVertical: 10 },
-  skipText: {
     fontSize: 14,
     fontFamily: 'Nunito_600SemiBold',
-    color: '#aaaaaa',
+    color: '#a3a3ad',
+  },
+  resendTextActive: {
+    color: '#7b2fcd',
+  },
+
+  skipWrap: { alignItems: 'center', paddingTop: 4 },
+  skipText: {
+    fontSize: 13,
+    fontFamily: 'Nunito_600SemiBold',
+    color: '#c2c2cc',
     textDecorationLine: 'underline',
   },
 
@@ -315,12 +325,12 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 12,
     fontFamily: 'Nunito_400Regular',
-    color: '#888888',
+    color: '#a3a3ad',
   },
   privacyText: {
     fontSize: 13,
     fontFamily: 'Nunito_700Bold',
-    color: '#6e2eb8',
+    color: '#7b2fcd',
     marginTop: 4,
   },
 });

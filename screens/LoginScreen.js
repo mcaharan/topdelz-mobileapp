@@ -1,6 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   ActivityIndicator,
   Alert,
@@ -43,77 +42,68 @@ export default function LoginScreen({ onLoggedIn, onGuestLogin }) {
     }
   };
 
+  const isValid = mobileNumber.length === 10;
+
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
-      {/* Gradient top band */}
-      <LinearGradient
-        colors={['#7b2fcd', '#c03b8f', '#e8574a']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.gradientStrip}
-      />
-
-      {/* White rounded card */}
       <KeyboardAvoidingView
         style={styles.body}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Logo */}
-        <Image
-          source={require('../assets/logo.png')}
-          style={styles.brandLogo}
-          resizeMode="contain"
-        />
-
-        <Text style={styles.title}>Login with Mobile Number</Text>
-        <Text style={styles.subtitle}>
-          Enter your mobile number we will sent{'\n'}you OTP to verify
-        </Text>
-
-        <Text style={styles.apiText}>API: {API_BASE_URL}</Text>
-
-        <View style={styles.inputWrapper}>
-          <TextInput
-            value={mobileNumber}
-            onChangeText={(value) =>
-              setMobileNumber(value.replace(/[^0-9]/g, '').slice(0, 10))
-            }
-            keyboardType="number-pad"
-            maxLength={10}
-            placeholder="Enter Mobile No."
-            placeholderTextColor="#aaaaaa"
-            style={styles.mobileInput}
+        <View style={styles.logoWrap}>
+          <Image
+            source={require('../assets/logo.png')}
+            style={styles.brandLogo}
+            resizeMode="contain"
           />
-          {mobileNumber.length === 10 && (
-            <Text style={styles.checkMark}>✓</Text>
-          )}
         </View>
 
-        <Pressable
-          style={[
-            styles.sendOtpButton,
-            { backgroundColor: mobileNumber.length === 10 ? '#6b21a8' : '#c0c0c0' },
-          ]}
-          disabled={mobileNumber.length < 10 || loading}
-          onPress={handleSendOtp}
-        >
-          {loading
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.sendOtpText}>Send OTP</Text>
-          }
-        </Pressable>
+        <View style={styles.card}>
+          <Text style={styles.title}>Welcome</Text>
+          <Text style={styles.subtitle}>
+            Enter your mobile number and we'll get you in — no OTP needed right now.
+          </Text>
 
-        <Pressable style={styles.guestWrap} onPress={() => { haptic(); onGuestLogin?.(); }}>
-          <Text style={styles.guestText}>Continue as Guest</Text>
-        </Pressable>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputPrefix}>+91</Text>
+            <TextInput
+              value={mobileNumber}
+              onChangeText={(value) =>
+                setMobileNumber(value.replace(/[^0-9]/g, '').slice(0, 10))
+              }
+              keyboardType="number-pad"
+              maxLength={10}
+              placeholder="Mobile number"
+              placeholderTextColor="#a3a3ad"
+              style={styles.mobileInput}
+            />
+            {isValid && <Text style={styles.checkMark}>✓</Text>}
+          </View>
+
+          <Pressable
+            style={[styles.primaryButton, !isValid && styles.primaryButtonDisabled]}
+            disabled={!isValid || loading}
+            onPress={handleSendOtp}
+          >
+            {loading
+              ? <ActivityIndicator color="#ffffff" />
+              : <Text style={styles.primaryButtonText}>Continue</Text>
+            }
+          </Pressable>
+
+          <Pressable style={styles.guestWrap} onPress={() => { haptic(); onGuestLogin?.(); }}>
+            <Text style={styles.guestText}>Continue as Guest</Text>
+          </Pressable>
+        </View>
+
+        <Text style={styles.apiText}>{API_BASE_URL}</Text>
       </KeyboardAvoidingView>
 
-      {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          By clicking 'Login', 'Signup', you accept our
+          By continuing, you accept our
         </Text>
         <Pressable>
           <Text style={styles.privacyText}>Privacy policy</Text>
@@ -124,91 +114,113 @@ export default function LoginScreen({ onLoggedIn, onGuestLogin }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#7b2fcd' },
-
-  gradientStrip: { height: 110 },
+  container: { flex: 1, backgroundColor: '#f7f7fb' },
 
   body: {
     flex: 1,
-    backgroundColor: '#ebebeb',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    marginTop: -28,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingHorizontal: 24,
+    justifyContent: 'center',
   },
 
+  logoWrap: {
+    alignItems: 'center',
+    marginBottom: 28,
+  },
   brandLogo: {
-    width: 220,
-    height: 68,
-    marginBottom: 32,
+    width: 200,
+    height: 62,
+  },
+
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#1a1a2e',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
+    elevation: 3,
   },
 
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontFamily: 'Nunito_800ExtraBold',
-    color: '#111111',
-    marginBottom: 6,
+    color: '#14141a',
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: 'Nunito_400Regular',
-    color: '#888888',
+    color: '#8b8b96',
     lineHeight: 20,
     marginBottom: 24,
   },
 
   inputWrapper: {
-    position: 'relative',
-    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f7f7fb',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#ececf2',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  inputPrefix: {
+    fontSize: 16,
+    fontFamily: 'Nunito_700Bold',
+    color: '#8b8b96',
+    marginRight: 10,
   },
   mobileInput: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#dcdcdc',
-    paddingVertical: 14,
-    paddingLeft: 16,
-    paddingRight: 44,
+    flex: 1,
+    paddingVertical: 16,
     fontSize: 16,
-    fontFamily: 'Nunito_400Regular',
-    color: '#2c2c2c',
+    fontFamily: 'Nunito_600SemiBold',
+    color: '#14141a',
   },
   checkMark: {
-    position: 'absolute',
-    right: 14,
-    top: '50%',
-    marginTop: -11,
-    fontSize: 20,
+    fontSize: 18,
     color: '#22c55e',
     fontFamily: 'Nunito_700Bold',
   },
 
-  sendOtpButton: {
+  primaryButton: {
     width: '100%',
-    borderRadius: 8,
-    paddingVertical: 14,
+    borderRadius: 16,
+    paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 14,
+    backgroundColor: '#7b2fcd',
+    shadowColor: '#7b2fcd',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 2,
   },
-  sendOtpText: {
-    color: '#f5f5f5',
-    fontSize: 17,
+  primaryButtonDisabled: {
+    backgroundColor: '#d8d8e2',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  primaryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
     fontFamily: 'Nunito_700Bold',
   },
 
-  guestWrap: { alignItems: 'center', paddingVertical: 6 },
+  guestWrap: { alignItems: 'center', paddingTop: 18 },
   guestText: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: 'Nunito_600SemiBold',
-    color: '#888888',
+    color: '#8b8b96',
   },
 
   apiText: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'Nunito_400Regular',
-    color: '#555555',
-    marginBottom: 12,
+    color: '#c2c2cc',
+    textAlign: 'center',
+    marginTop: 16,
   },
 
   footer: {
@@ -221,12 +233,12 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 12,
     fontFamily: 'Nunito_400Regular',
-    color: '#888888',
+    color: '#a3a3ad',
   },
   privacyText: {
     fontSize: 13,
     fontFamily: 'Nunito_700Bold',
-    color: '#6e2eb8',
+    color: '#7b2fcd',
     marginTop: 4,
   },
 });
