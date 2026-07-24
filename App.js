@@ -277,6 +277,7 @@ const sk = StyleSheet.create({
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getProfile } from './services/api';
 import LoginScreen from './screens/LoginScreen';
+import PermissionsScreen from './screens/PermissionsScreen';
 import OtpScreen from './screens/OtpScreen';
 import UserTypeScreen from './screens/UserTypeScreen';
 import InterestsScreen from './screens/InterestsScreen';
@@ -319,22 +320,26 @@ function FadeScreen({ children, slideFrom = 'bottom' }) {
 export default function App() {
   const [splashDone, setSplashDone] = useState(false);
   const [showLoginScreen, setShowLoginScreen] = useState(false);
+  const [showPermissionsScreen, setShowPermissionsScreen] = useState(false);
   const [showOtpScreen, setShowOtpScreen] = useState(false);
   const [showUserTypeScreen, setShowUserTypeScreen] = useState(false);
   const [showInterestsScreen, setShowInterestsScreen] = useState(false);
   const [showHomeScreen, setShowHomeScreen] = useState(false);
   const [mobileNumber, setMobileNumber] = useState('');
-  const [prefillOtp, setPrefillOtp] = useState('');
+  const [user, setUser] = useState(null);
+  const [reverifyMode, setReverifyMode] = useState(false);
   const lastBackPressRef = useRef(0);
 
   const navigateTo = (screen) => {
     setShowLoginScreen(false);
+    setShowPermissionsScreen(false);
     setShowOtpScreen(false);
     setShowUserTypeScreen(false);
     setShowInterestsScreen(false);
     setShowHomeScreen(false);
 
     if (screen === 'login') setShowLoginScreen(true);
+    if (screen === 'permissions') setShowPermissionsScreen(true);
     if (screen === 'otp') setShowOtpScreen(true);
     if (screen === 'userType') setShowUserTypeScreen(true);
     if (screen === 'interests') setShowInterestsScreen(true);
@@ -356,6 +361,7 @@ export default function App() {
         try {
           const data = await getProfile();
           const user = data.user;
+          setUser(user);
           if (user?.user_type && user?.interests_count > 0) {
             navigateTo('home');
           } else {
@@ -392,6 +398,11 @@ export default function App() {
       }
 
       if (showOtpScreen) {
+        navigateTo(reverifyMode ? 'home' : 'permissions');
+        return true;
+      }
+
+      if (showPermissionsScreen) {
         navigateTo('login');
         return true;
       }
@@ -415,10 +426,12 @@ export default function App() {
     splashDone,
     showHomeScreen,
     showLoginScreen,
+    showPermissionsScreen,
     showOtpScreen,
     showUserTypeScreen,
     showInterestsScreen,
     mobileNumber,
+    reverifyMode,
   ]);
 
   if (!fontsLoaded) {
@@ -431,14 +444,24 @@ export default function App() {
 
   const handleLogout = () => {
     setMobileNumber('');
-    setPrefillOtp('');
+    setUser(null);
+    setReverifyMode(false);
     navigateTo('login');
+  };
+
+  const openVerifyPhone = () => {
+    setReverifyMode(true);
+    navigateTo('otp');
   };
 
   if (showHomeScreen) {
     return (
       <FadeScreen slideFrom="right">
-        <HomeScreen onLogout={handleLogout} />
+        <HomeScreen
+          onLogout={handleLogout}
+          phoneVerified={user?.phone_verified === true}
+          onVerifyPhone={openVerifyPhone}
+        />
       </FadeScreen>
     );
   }
@@ -462,13 +485,37 @@ export default function App() {
   if (showOtpScreen) {
     return (
       <FadeScreen slideFrom="right">
-        <OtpScreen mobileNumber={mobileNumber} prefillOtp={prefillOtp} onVerified={(user) => {
-          if (user?.user_type && user?.interests_count > 0) {
-            navigateTo('home');
-          } else {
-            navigateTo('userType');
-          }
-        }} />
+        <OtpScreen
+          mobileNumber={mobileNumber}
+          allowSkip={true}
+          onVerified={(verifiedUser) => {
+            setUser(verifiedUser);
+            if (reverifyMode) {
+              navigateTo('home');
+            } else if (verifiedUser?.user_type && verifiedUser?.interests_count > 0) {
+              navigateTo('home');
+            } else {
+              navigateTo('userType');
+            }
+          }}
+          onSkip={() => {
+            if (reverifyMode) {
+              navigateTo('home');
+            } else if (user?.user_type && user?.interests_count > 0) {
+              navigateTo('home');
+            } else {
+              navigateTo('userType');
+            }
+          }}
+        />
+      </FadeScreen>
+    );
+  }
+
+  if (showPermissionsScreen) {
+    return (
+      <FadeScreen slideFrom="right">
+        <PermissionsScreen onContinue={() => navigateTo('otp')} />
       </FadeScreen>
     );
   }
@@ -476,7 +523,12 @@ export default function App() {
   return (
     <FadeScreen slideFrom="bottom">
       <LoginScreen
-        onOtpSent={(mobile, otp) => { setMobileNumber(mobile); setPrefillOtp(otp || ''); navigateTo('otp'); }}
+        onLoggedIn={(mobile, loggedInUser) => {
+          setMobileNumber(mobile);
+          setUser(loggedInUser);
+          setReverifyMode(false);
+          navigateTo('permissions');
+        }}
         onGuestLogin={() => navigateTo('home')}
       />
     </FadeScreen>

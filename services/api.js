@@ -4,11 +4,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 /**
  * Base URL of the Laravel backend.
  * For local development:
- *   - iOS Simulator  → http://127.0.0.1:8000/api
- *   - Android Emulator → http://10.0.2.2:8000/api
+ *   - iOS Simulator  → http://127.0.0.1:8000/api (or your configured port)
+ *   - Android Emulator → http://10.0.2.2:8000/api (or your configured port)
  *   - Physical device  → use your machine's LAN IP, e.g. http://192.168.1.x:8000/api
+ * Set EXPO_PUBLIC_API_BASE_URL in your .env file (copy from .env.example)
  */
-export const API_BASE_URL = 'http://192.168.1.3:8000/api';
+// Prefer explicit EXPO_PUBLIC_API_BASE_URL, fall back to the current LAN dev host
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://192.168.1.8:8000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -29,6 +31,13 @@ api.interceptors.request.use(async (config) => {
 });
 
 /* ─── Auth endpoints ─────────────────────────────────────── */
+
+/**
+ * Log in (or create) a user by mobile number alone, without OTP.
+ * @param {string} mobile  10-digit mobile number
+ */
+export const loginWithMobile = (mobile) =>
+  api.post('/login', { mobile }).then((r) => r.data);
 
 /**
  * Request an OTP for the given mobile number.
@@ -64,5 +73,28 @@ export const getHomeData = (lat, lng) => {
   const params = lat != null && lng != null ? { lat, lng } : {};
   return api.get('/home-data', { params }).then((r) => r.data);
 };
+
+export const viewStory = (storyId, viewerId) =>
+  api.post(`/stories/${storyId}/view`, { viewer_id: viewerId }).then((r) => r.data);
+
+export const getWishlist = () =>
+  api.get('/wishlist').then((r) => r.data);
+
+export const getWishlistHistory = () =>
+  api.get('/wishlist/history').then((r) => r.data);
+
+export const addToWishlist = (itemType, itemId) =>
+  api.post(`/wishlist/${itemType}/${itemId}`).then((r) => r.data);
+
+export const removeFromWishlist = (itemType, itemId) =>
+  api.delete(`/wishlist/${itemType}/${itemId}`).then((r) => r.data);
+
+export const trackOfferEvent = (itemType, itemId, action, extra = {}) =>
+  api.post('/offer-events', {
+    item_type: itemType,
+    item_id: itemId,
+    action,
+    ...extra,
+  }).then((r) => r.data);
 
 export default api;

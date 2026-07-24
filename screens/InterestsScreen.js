@@ -1,9 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   ActivityIndicator,
-  Dimensions,
   Image,
   Pressable,
   ScrollView,
@@ -18,31 +16,21 @@ function haptic() { Vibration.vibrate(8); }
 
 function ProgressBar() {
   return (
-    <View style={{ marginBottom: 20, paddingHorizontal: 20 }}>
-      <Text style={{ fontSize: 11, fontFamily: 'Nunito_600SemiBold', color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>Step 3 of 3</Text>
-      <View style={{ height: 5, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3 }}>
-        <View style={{ height: 5, backgroundColor: '#a855f7', borderRadius: 3, width: '100%' }} />
+    <View style={progStyles.wrap}>
+      <Text style={progStyles.label}>Step 3 of 3</Text>
+      <View style={progStyles.track}>
+        <View style={progStyles.fill} />
       </View>
     </View>
   );
 }
 
-const { width } = Dimensions.get('window');
-
-const INTERESTS = [
-  { id: 'dine',    label: 'Dine-Out',         emoji: '🍽️' },
-  { id: 'night',   label: 'Night Life',        emoji: '🌙' },
-  { id: 'family',  label: 'Family Dining',     emoji: '👨‍👩‍👧' },
-  { id: 'veggie',  label: 'Veggies',           emoji: '🥗' },
-  { id: 'nonveg',  label: 'Non-veg',           emoji: '🍗' },
-  { id: 'beauty',  label: 'Beauty & Grooming', emoji: '💅' },
-  { id: 'near',    label: 'Near me',           emoji: '📍' },
-  { id: 'events',  label: 'Events',            emoji: '🎉' },
-  { id: 'travel',  label: 'Travel',            emoji: '✈️' },
-  { id: 'coffee',  label: 'Cafés',             emoji: '☕' },
-  { id: 'movies',  label: 'Movies',            emoji: '🎬' },
-  { id: 'sports',  label: 'Sports',            emoji: '⚽' },
-];
+const progStyles = StyleSheet.create({
+  wrap: { marginBottom: 20 },
+  label: { fontSize: 11, fontFamily: 'Nunito_600SemiBold', color: '#a3a3ad', marginBottom: 6 },
+  track: { height: 4, backgroundColor: '#ececf2', borderRadius: 3 },
+  fill: { height: 4, backgroundColor: '#7b2fcd', borderRadius: 3, width: '100%' },
+});
 
 function Chip({ item, selected, onPress }) {
   return (
@@ -93,19 +81,7 @@ export default function InterestsScreen({ onSave, onBack }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
-
-      {/* Gradient background */}
-      <LinearGradient
-        colors={['#7b2fcd', '#c03b8f', '#e8574a']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-
-      {/* Decorative circles */}
-      <View style={styles.circleTR} />
-      <View style={styles.circleBL} />
+      <StatusBar style="dark" />
 
       <Pressable
         style={styles.backBtn}
@@ -114,7 +90,6 @@ export default function InterestsScreen({ onSave, onBack }) {
         <Text style={styles.backBtnText}>← Back</Text>
       </Pressable>
 
-      {/* Logo area */}
       <View style={styles.logoWrap}>
         <Image
           source={require('../assets/logo.png')}
@@ -123,20 +98,18 @@ export default function InterestsScreen({ onSave, onBack }) {
         />
       </View>
 
-      {/* Title */}
       <ProgressBar />
       <Text style={styles.pageTitle}>Choose your Interests</Text>
       <Text style={styles.pageSubtitle}>Pick topics you love — we'll show you the best deals</Text>
 
-      {/* Dark card with chips */}
-      <View style={styles.darkCard}>
+      <View style={styles.card}>
         <ScrollView
           contentContainerStyle={styles.chipsContainer}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.chipsWrap}>
             {loadingData ? (
-              <ActivityIndicator color="#a855f7" style={{ marginTop: 40 }} />
+              <ActivityIndicator color="#7b2fcd" style={{ marginTop: 40 }} />
             ) : interests.map((item) => (
               <Chip
                 key={item.id}
@@ -147,7 +120,6 @@ export default function InterestsScreen({ onSave, onBack }) {
             ))}
           </View>
 
-          {/* Selected count badge */}
           {selected.size > 0 && (
             <View style={styles.countBadge}>
               <Text style={styles.countBadgeText}>
@@ -157,23 +129,15 @@ export default function InterestsScreen({ onSave, onBack }) {
           )}
         </ScrollView>
 
-        {/* Save button */}
         <Pressable
           style={[styles.saveBtn, (selected.size === 0 || saving) && styles.saveBtnDisabled]}
           disabled={selected.size === 0 || saving}
           onPress={handleSave}
         >
-          <LinearGradient
-            colors={selected.size > 0 ? ['#a855f7', '#7b2fcd'] : ['#555', '#444']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.saveBtnGradient}
-          >
-            {saving
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.saveBtnText}>Save & Continue</Text>
-            }
-          </LinearGradient>
+          {saving
+            ? <ActivityIndicator color="#ffffff" />
+            : <Text style={styles.saveBtnText}>Save & Continue</Text>
+          }
         </Pressable>
       </View>
     </View>
@@ -181,26 +145,7 @@ export default function InterestsScreen({ onSave, onBack }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-
-  circleTR: {
-    position: 'absolute',
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    top: -60,
-    right: -60,
-  },
-  circleBL: {
-    position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    top: 100,
-    left: -50,
-  },
+  container: { flex: 1, backgroundColor: '#f7f7fb' },
 
   logoWrap: {
     alignItems: 'center',
@@ -208,8 +153,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   logo: {
-    width: 190,
-    height: 58,
+    width: 180,
+    height: 56,
   },
 
   backBtn: {
@@ -220,10 +165,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: '#ffffff',
+    shadowColor: '#1a1a2e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   backBtnText: {
-    color: '#ffffff',
+    color: '#14141a',
     fontSize: 14,
     fontFamily: 'Nunito_700Bold',
   },
@@ -231,28 +181,33 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 22,
     fontFamily: 'Nunito_800ExtraBold',
-    color: '#ffffff',
+    color: '#14141a',
     textAlign: 'center',
     marginBottom: 6,
+    paddingHorizontal: 20,
   },
   pageSubtitle: {
     fontSize: 13,
     fontFamily: 'Nunito_400Regular',
-    color: 'rgba(255,255,255,0.75)',
+    color: '#8b8b96',
     textAlign: 'center',
-    marginBottom: 28,
+    marginBottom: 20,
     paddingHorizontal: 32,
   },
 
-  /* Dark bottom card */
-  darkCard: {
+  card: {
     flex: 1,
-    backgroundColor: '#1e1270',
-    borderTopLeftRadius: 36,
-    borderTopRightRadius: 36,
-    paddingTop: 28,
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 24,
     paddingHorizontal: 20,
     paddingBottom: 36,
+    shadowColor: '#1a1a2e',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 2,
   },
 
   chipsContainer: {
@@ -265,7 +220,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 
-  /* Individual chip */
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -274,12 +228,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 50,
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.25)',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: '#ececf2',
+    backgroundColor: '#f7f7fb',
   },
   chipSelected: {
-    borderColor: '#a855f7',
-    backgroundColor: 'rgba(168,85,247,0.22)',
+    borderColor: '#7b2fcd',
+    backgroundColor: '#f3e8ff',
   },
   chipEmoji: {
     fontSize: 15,
@@ -287,17 +241,17 @@ const styles = StyleSheet.create({
   chipLabel: {
     fontSize: 14,
     fontFamily: 'Nunito_600SemiBold',
-    color: 'rgba(255,255,255,0.85)',
+    color: '#4b4b56',
   },
   chipLabelSelected: {
-    color: '#e9d5ff',
+    color: '#6b21a8',
     fontFamily: 'Nunito_700Bold',
   },
 
   countBadge: {
     alignSelf: 'flex-start',
     marginTop: 16,
-    backgroundColor: 'rgba(168,85,247,0.3)',
+    backgroundColor: '#f3e8ff',
     borderRadius: 50,
     paddingVertical: 4,
     paddingHorizontal: 14,
@@ -305,22 +259,28 @@ const styles = StyleSheet.create({
   countBadgeText: {
     fontSize: 12,
     fontFamily: 'Nunito_600SemiBold',
-    color: '#e9d5ff',
+    color: '#6b21a8',
   },
 
-  /* Save button */
   saveBtn: {
     marginTop: 16,
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  saveBtnDisabled: { opacity: 0.5 },
-  saveBtnGradient: {
+    borderRadius: 16,
+    backgroundColor: '#7b2fcd',
     paddingVertical: 16,
     alignItems: 'center',
+    shadowColor: '#7b2fcd',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  saveBtnDisabled: {
+    backgroundColor: '#d8d8e2',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   saveBtnText: {
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: 'Nunito_700Bold',
     color: '#ffffff',
     letterSpacing: 0.3,

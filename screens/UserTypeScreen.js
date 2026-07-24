@@ -1,10 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   ActivityIndicator,
-  Alert,
-  Dimensions,
   Image,
   Pressable,
   StyleSheet,
@@ -18,18 +15,23 @@ function haptic() { Vibration.vibrate(8); }
 
 function ProgressBar({ step, total }) {
   return (
-    <View style={{ marginBottom: 20 }}>
-      <Text style={{ fontSize: 11, fontFamily: 'Nunito_600SemiBold', color: '#aaaaaa', marginBottom: 6 }}>Step {step} of {total}</Text>
-      <View style={{ height: 5, backgroundColor: '#e0e0e0', borderRadius: 3 }}>
-        <View style={{ height: 5, backgroundColor: '#7b2fcd', borderRadius: 3, width: `${(step / total) * 100}%` }} />
+    <View style={progStyles.wrap}>
+      <Text style={progStyles.label}>Step {step} of {total}</Text>
+      <View style={progStyles.track}>
+        <View style={[progStyles.fill, { width: `${(step / total) * 100}%` }]} />
       </View>
     </View>
   );
 }
 
-const { width, height } = Dimensions.get('window');
+const progStyles = StyleSheet.create({
+  wrap: { marginBottom: 20 },
+  label: { fontSize: 11, fontFamily: 'Nunito_600SemiBold', color: '#a3a3ad', marginBottom: 6 },
+  track: { height: 4, backgroundColor: '#ececf2', borderRadius: 3 },
+  fill: { height: 4, backgroundColor: '#7b2fcd', borderRadius: 3 },
+});
 
-const CARD_ICON_SIZE = 80;
+const CARD_ICON_SIZE = 76;
 
 function ChoiceCard({ icon, label, selected, onPress }) {
   return (
@@ -68,21 +70,8 @@ export default function UserTypeScreen({ onSelect, onBack }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
-      {/* Full gradient background */}
-      <LinearGradient
-        colors={['#7b2fcd', '#c03b8f', '#e8574a']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-
-      {/* Decorative circles */}
-      <View style={styles.circleLarge} />
-      <View style={styles.circleSmall} />
-
-      {/* Logo */}
       <Pressable
         style={styles.backBtn}
         onPress={() => { haptic(); onBack?.(); }}
@@ -90,13 +79,14 @@ export default function UserTypeScreen({ onSelect, onBack }) {
         <Text style={styles.backBtnText}>← Back</Text>
       </Pressable>
 
-      <Image
-        source={require('../assets/logo.png')}
-        style={styles.logo}
-        resizeMode="contain"
-      />
+      <View style={styles.logoWrap}>
+        <Image
+          source={require('../assets/logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      </View>
 
-      {/* White card */}
       <View style={styles.card}>
         <ProgressBar step={2} total={3} />
         <Text style={styles.cardTitle}>Who are you?</Text>
@@ -104,7 +94,6 @@ export default function UserTypeScreen({ onSelect, onBack }) {
           Tell us about yourself so we can{'\n'}personalise your experience
         </Text>
 
-        {/* Choice tiles */}
         <View style={styles.choicesRow}>
           <ChoiceCard
             icon="✈️"
@@ -120,23 +109,15 @@ export default function UserTypeScreen({ onSelect, onBack }) {
           />
         </View>
 
-        {/* Continue button */}
         <Pressable
           style={[styles.continueBtn, (!selected || loading) && styles.continueBtnDisabled]}
           disabled={!selected || loading}
           onPress={handleContinue}
         >
-          <LinearGradient
-            colors={selected ? ['#7b2fcd', '#c03b8f'] : ['#cccccc', '#bbbbbb']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.continueBtnGradient}
-          >
-            {loading
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.continueBtnText}>Continue →</Text>
-            }
-          </LinearGradient>
+          {loading
+            ? <ActivityIndicator color="#ffffff" />
+            : <Text style={styles.continueBtnText}>Continue →</Text>
+          }
         </Pressable>
       </View>
     </View>
@@ -144,34 +125,16 @@ export default function UserTypeScreen({ onSelect, onBack }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#f7f7fb' },
 
-  /* Decorative background circles */
-  circleLarge: {
-    position: 'absolute',
-    width: 340,
-    height: 340,
-    borderRadius: 170,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    top: -80,
-    right: -80,
-  },
-  circleSmall: {
-    position: 'absolute',
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    top: 160,
-    left: -50,
-  },
-
-  logo: {
-    width: 200,
-    height: 62,
-    alignSelf: 'center',
+  logoWrap: {
+    alignItems: 'center',
     marginTop: 64,
-    marginBottom: 32,
+    marginBottom: 24,
+  },
+  logo: {
+    width: 180,
+    height: 56,
   },
 
   backBtn: {
@@ -182,55 +145,63 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: '#ffffff',
+    shadowColor: '#1a1a2e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   backBtnText: {
-    color: '#ffffff',
+    color: '#14141a',
     fontSize: 14,
     fontFamily: 'Nunito_700Bold',
   },
 
-  /* Main white card */
   card: {
     flex: 1,
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 36,
-    borderTopRightRadius: 36,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     paddingHorizontal: 24,
-    paddingTop: 36,
+    paddingTop: 28,
     paddingBottom: 40,
+    shadowColor: '#1a1a2e',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 2,
   },
 
   cardTitle: {
-    fontSize: 26,
+    fontSize: 24,
     fontFamily: 'Nunito_800ExtraBold',
-    color: '#1a1060',
+    color: '#14141a',
     textAlign: 'center',
     marginBottom: 8,
   },
   cardSubtitle: {
     fontSize: 14,
     fontFamily: 'Nunito_400Regular',
-    color: '#888888',
+    color: '#8b8b96',
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 36,
+    lineHeight: 20,
+    marginBottom: 32,
   },
 
-  /* Choice cards row */
   choicesRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 16,
-    marginBottom: 36,
+    marginBottom: 32,
   },
 
   choiceCard: {
     flex: 1,
     borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#f9f9ff',
+    borderWidth: 1.5,
+    borderColor: '#ececf2',
+    backgroundColor: '#f7f7fb',
     alignItems: 'center',
     paddingVertical: 28,
     paddingHorizontal: 8,
@@ -238,33 +209,33 @@ const styles = StyleSheet.create({
   },
   choiceCardSelected: {
     borderColor: '#7b2fcd',
-    backgroundColor: '#f3ecff',
+    backgroundColor: '#f3e8ff',
   },
 
   iconCircle: {
     width: CARD_ICON_SIZE,
     height: CARD_ICON_SIZE,
     borderRadius: CARD_ICON_SIZE / 2,
-    backgroundColor: '#ede9fe',
+    backgroundColor: '#ececf2',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 14,
   },
   iconCircleSelected: {
-    backgroundColor: '#d8b4fe',
+    backgroundColor: '#e9d5ff',
   },
   iconEmoji: {
-    fontSize: 36,
+    fontSize: 34,
   },
 
   choiceLabel: {
     fontSize: 15,
     fontFamily: 'Nunito_700Bold',
-    color: '#555555',
+    color: '#4b4b56',
     textAlign: 'center',
   },
   choiceLabelSelected: {
-    color: '#7b2fcd',
+    color: '#6b21a8',
   },
 
   selectedDot: {
@@ -277,20 +248,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#7b2fcd',
   },
 
-  /* Continue button */
   continueBtn: {
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  continueBtnDisabled: {
-    opacity: 0.6,
-  },
-  continueBtnGradient: {
+    borderRadius: 16,
+    backgroundColor: '#7b2fcd',
     paddingVertical: 16,
     alignItems: 'center',
+    shadowColor: '#7b2fcd',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  continueBtnDisabled: {
+    backgroundColor: '#d8d8e2',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   continueBtnText: {
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: 'Nunito_700Bold',
     color: '#ffffff',
     letterSpacing: 0.4,
