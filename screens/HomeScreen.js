@@ -2,7 +2,6 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import MapView, { Marker, Callout, PROVIDER_DEFAULT } from 'react-native-maps';
 import {
@@ -258,14 +257,10 @@ function CategoryItem({ item, active, onPress }) {
   return (
     <Pressable onPress={onPress} activeOpacity={0.8}>
       {active ? (
-        <LinearGradient
-          colors={['#7b2fcd', '#c03b8f']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={styles.catPillActive}
-        >
+        <View style={styles.catPillActive}>
           <Text style={{ fontSize: 15 }}>{item.emoji}</Text>
           <Text style={styles.catPillLabelActive} numberOfLines={1}>{item.label.replace('\n', ' ')}</Text>
-        </LinearGradient>
+        </View>
       ) : (
         <View style={[styles.catPill, { backgroundColor: item.color }]}>
           <Text style={{ fontSize: 15 }}>{item.emoji}</Text>
@@ -319,12 +314,9 @@ function BannerSlider({ banners = [], onOpenStore, onOpenMultipleStores }) {
         style={{ marginHorizontal: 14 }}
       >
         {banners.map((b) => (
-          <LinearGradient
+          <View
             key={b.id}
-            colors={b.colors}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.heroBanner}
+            style={[styles.heroBanner, { backgroundColor: (b.colors && b.colors[0]) || '#7b2fcd' }]}
           >
             <View style={{ flex: 1 }}>
               <View style={styles.heroBadge}>
@@ -358,7 +350,7 @@ function BannerSlider({ banners = [], onOpenStore, onOpenMultipleStores }) {
                 ))
               )}
             </View>
-          </LinearGradient>
+          </View>
         ))}
       </ScrollView>
       {/* Dots */}
@@ -373,7 +365,7 @@ function BannerSlider({ banners = [], onOpenStore, onOpenMultipleStores }) {
 
 function FlashDealCard({ item, countdown, isSaved, onToggleWishlist, onOpen }) {
   return (
-    <LinearGradient colors={item.bg} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.flashCard}>
+    <View style={[styles.flashCard, { backgroundColor: (item.bg && item.bg[0]) || '#7b2fcd' }]}>
       <Pressable style={styles.quickSaveBtn} onPress={() => onToggleWishlist?.('flash_deal', item)}>
         <Text style={styles.quickSaveText}>{isSaved ? '♥' : '♡'}</Text>
       </Pressable>
@@ -400,7 +392,7 @@ function FlashDealCard({ item, countdown, isSaved, onToggleWishlist, onOpen }) {
       >
         <Text style={styles.flashShareText}>📤 Share</Text>
       </Pressable>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -424,11 +416,11 @@ function StoryRow({ stories = [], onStoryPress, seenStoryIds = {} }) {
             }}
             style={{ alignItems: 'center', gap: 5 }}
           >
-            <LinearGradient
-              colors={seen ? ['#d1d5db', '#9ca3af'] : ['#7b2fcd', '#c03b8f']}
+            <View
               style={{
                 width: 64, height: 64, borderRadius: 32,
                 padding: 3, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: seen ? '#d1d5db' : '#7b2fcd',
               }}
             >
               <View style={{
@@ -447,7 +439,7 @@ function StoryRow({ stories = [], onStoryPress, seenStoryIds = {} }) {
                   <Text style={{ fontSize: 24 }}>{story.emoji || '⭐'}</Text>
                 )}
               </View>
-            </LinearGradient>
+            </View>
             <Text
               style={{
                 fontSize: 11, fontFamily: 'Nunito_600SemiBold',
@@ -825,28 +817,23 @@ const StoryViewer = React.memo(function StoryViewer({ visible, storiesList, inde
 
 function SpecialOfferStrip() {
   return (
-    <LinearGradient
-      colors={['#1a237e', '#283593']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 0 }}
-      style={styles.offerStrip}
-    >
+    <View style={styles.offerStrip}>
       <View style={{ flex: 1 }}>
         <Text style={styles.offerStripBadge}>🎉 LIMITED TIME OFFER</Text>
         <Text style={styles.offerStripTitle}>Free Delivery All Day!</Text>
         <Text style={styles.offerStripSub}>
           Use code:{' '}
-          <Text style={{ fontFamily: 'Nunito_800ExtraBold', color: '#fbbf24' }}>TOPDELZ</Text>
+          <Text style={{ fontFamily: 'Nunito_800ExtraBold', color: '#7b2fcd' }}>TOPDELZ</Text>
         </Text>
       </View>
       <Text style={{ fontSize: 56 }}>🛵</Text>
-    </LinearGradient>
+    </View>
   );
 }
 
 function DealCard({ deal, isSaved, onToggleWishlist, onOpen }) {
   return (
-    <LinearGradient colors={deal.color} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.dealCard}>
+    <View style={[styles.dealCard, { backgroundColor: (deal.color && deal.color[0]) || '#7b2fcd' }]}>
       <Pressable style={styles.quickSaveBtn} onPress={() => onToggleWishlist?.('deal_card', deal)}>
         <Text style={styles.quickSaveText}>{isSaved ? '♥' : '♡'}</Text>
       </Pressable>
@@ -872,7 +859,7 @@ function DealCard({ deal, isSaved, onToggleWishlist, onOpen }) {
           <Text style={styles.dealShareText}>📤</Text>
         </Pressable>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -937,30 +924,38 @@ function NearbyCard({ store, onPress, isSaved, onToggleWishlist }) {
 }
 
 function TabBar({ activeTab, setActiveTab }) {
-  const { colors } = useContext(ThemeContext);
-  const tabs = [
-    { id: 'home',     emoji: '🏠', label: 'Home' },
-    { id: 'wishlist', emoji: '♡',  label: 'Wishlist' },
-    { id: 'explore',  emoji: '🗺️', label: 'Explore' },
-    { id: 'offers',   emoji: '▶',  label: 'Offers' },
+  const leftTabs = [
+    { id: 'home',     icon: 'home'  },
+    { id: 'wishlist', icon: 'heart' },
   ];
+  const rightTabs = [
+    { id: 'explore', icon: 'compass'  },
+    { id: 'offers',  icon: 'pricetag' },
+  ];
+
+  const renderTab = (t) => {
+    const active = activeTab === t.id;
+    return (
+      <Pressable key={t.id} style={styles.floatTabItem} onPress={() => setActiveTab(t.id)}>
+        <Ionicons name={active ? t.icon : `${t.icon}-outline`} size={22} color={active ? '#7b2fcd' : '#c2c2cc'} />
+        <View style={[styles.floatTabDot, active && styles.floatTabDotActive]} />
+      </Pressable>
+    );
+  };
+
   return (
-    <View style={[styles.tabBar, { backgroundColor: colors.tabBg }]}>
-      {tabs.map((t) => (
-        <Pressable key={t.id} style={styles.tabItem} onPress={() => setActiveTab(t.id)}>
-          {activeTab === t.id ? (
-            <LinearGradient colors={['#7b2fcd', '#c03b8f']} style={styles.tabActivePill}>
-              <Text style={styles.tabEmojiActive}>{t.emoji}</Text>
-              <Text style={styles.tabLabelActive}>{t.label}</Text>
-            </LinearGradient>
-          ) : (
-            <>
-              <Text style={styles.tabEmoji}>{t.emoji}</Text>
-              <Text style={[styles.tabLabel, { color: colors.tabText }]}>{t.label}</Text>
-            </>
-          )}
-        </Pressable>
-      ))}
+    <View style={styles.floatTabBarWrap} pointerEvents="box-none">
+      <View style={styles.floatTabBar}>
+        {leftTabs.map(renderTab)}
+        <View style={styles.floatTabCenterSpacer} />
+        {rightTabs.map(renderTab)}
+      </View>
+      <Pressable
+        style={styles.floatTabCenterBtn}
+        onPress={() => setActiveTab('trending')}
+      >
+        <Ionicons name="flame" size={26} color="#ffffff" />
+      </Pressable>
     </View>
   );
 }
@@ -1013,9 +1008,9 @@ const NOTIF_FILTERS = [
 ];
 
 const NOTIF_TYPE_COLOR = {
-  deal:  ['#ff6f00', '#f57c00'],
-  order: ['#1d3fad', '#0d47a1'],
-  promo: ['#7b2fcd', '#c03b8f'],
+  deal:  '#ff6f00',
+  order: '#1d3fad',
+  promo: '#7b2fcd',
 };
 
 function NotificationsPanel({ onClose }) {
@@ -1060,12 +1055,7 @@ function NotificationsPanel({ onClose }) {
         <Pressable style={StyleSheet.absoluteFillObject} onPress={close} />
         <Animated.View style={[styles.notifsPanel, { backgroundColor: colors.notifPanel, transform: [{ translateY: slideAnim }] }]}>
           {/* Header */}
-          <LinearGradient
-            colors={['#7b2fcd', '#c03b8f']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.notifsHeaderGrad}
-          >
+          <View style={styles.notifsHeaderGrad}>
             <View style={styles.notifsHeaderTop}>
               <View>
                 <Text style={styles.notifsTitle}>Notifications</Text>
@@ -1106,7 +1096,7 @@ function NotificationsPanel({ onClose }) {
                 </Pressable>
               ))}
             </ScrollView>
-          </LinearGradient>
+          </View>
 
           {/* List */}
           {filtered.length === 0 ? (
@@ -1133,14 +1123,9 @@ function NotificationsPanel({ onClose }) {
                   }}
                 >
                   {/* Colored icon */}
-                  <LinearGradient
-                    colors={NOTIF_TYPE_COLOR[n.type]}
-                    style={styles.notifIconBox}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  >
+                  <View style={[styles.notifIconBox, { backgroundColor: NOTIF_TYPE_COLOR[n.type] }]}>
                     <Text style={{ fontSize: 20 }}>{n.icon}</Text>
-                  </LinearGradient>
+                  </View>
 
                   {/* Text */}
                   <View style={{ flex: 1 }}>
@@ -1184,6 +1169,67 @@ const W_FILTERS = [
   { id: 'deal', label: '🎟️ Deals' },
 ];
 
+function TrendingView({ items = [], onOpenStore, onOpenMultipleStores }) {
+  const { colors } = useContext(ThemeContext);
+
+  const handlePress = (item) => {
+    haptic();
+    const linked = item.linked_stores || [];
+    if (linked.length === 1) {
+      onOpenStore?.(linked[0]);
+    } else if (linked.length > 1) {
+      onOpenMultipleStores?.(item);
+    }
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <View style={styles.trendingHeader}>
+        <Text style={styles.trendingHeaderTitle}>🔥 Trending</Text>
+        <Text style={styles.trendingHeaderSub}>What's hot right now</Text>
+      </View>
+
+      {items.length === 0 ? (
+        <View style={styles.wishlistEmpty}>
+          <Text style={{ fontSize: 64 }}>🔥</Text>
+          <Text style={styles.wishlistEmptyTitle}>Nothing trending right now</Text>
+          <Text style={styles.wishlistEmptySub}>Check back soon for what's hot</Text>
+        </View>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ padding: 14, gap: 12, paddingBottom: 110 }}
+        >
+          {items.map((item) => (
+            <Pressable
+              key={item.id}
+              style={[styles.trendingCard, { backgroundColor: colors.card }]}
+              onPress={() => handlePress(item)}
+            >
+              <View style={[styles.trendingCardIcon, { backgroundColor: item.color?.[0] || '#7b2fcd' }]}>
+                {item.image_url ? (
+                  <Image source={{ uri: item.image_url }} style={{ width: '100%', height: '100%', borderRadius: 16 }} resizeMode="cover" />
+                ) : (
+                  <Text style={{ fontSize: 30 }}>{item.emoji || '🔥'}</Text>
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.trendingCardTitle, { color: colors.text }]} numberOfLines={1}>{item.title || 'Trending'}</Text>
+                {!!item.linked_stores?.length && (
+                  <Text style={styles.trendingCardMeta}>
+                    {item.linked_stores.length === 1 ? item.linked_stores[0].name : `${item.linked_stores.length} stores`}
+                  </Text>
+                )}
+              </View>
+              {!!item.linked_stores?.length && <Text style={styles.trendingCardArrow}>›</Text>}
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
 function WishlistView({ items = WISHLIST_ITEMS, history = [], onRemove }) {
   const { colors } = useContext(ThemeContext);
   const [filter, setFilter] = useState('all');
@@ -1197,13 +1243,8 @@ function WishlistView({ items = WISHLIST_ITEMS, history = [], onRemove }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      {/* Gradient header */}
-      <LinearGradient
-        colors={['#7b2fcd', '#c03b8f']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.wishlistHeader}
-      >
+      {/* Header */}
+      <View style={styles.wishlistHeader}>
         <View style={styles.wishlistHeaderTop}>
           <View>
             <Text style={styles.wishlistHeaderTitle}>My Wishlist</Text>
@@ -1238,7 +1279,7 @@ function WishlistView({ items = WISHLIST_ITEMS, history = [], onRemove }) {
             </Pressable>
           ))}
         </ScrollView>
-      </LinearGradient>
+      </View>
 
       {filtered.length === 0 ? (
         <View style={styles.wishlistEmpty}>
@@ -1249,7 +1290,7 @@ function WishlistView({ items = WISHLIST_ITEMS, history = [], onRemove }) {
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ padding: 14, gap: 14, paddingBottom: 28 }}
+          contentContainerStyle={{ padding: 14, gap: 14, paddingBottom: 110 }}
         >
           {/* Summary strip */}
           <View style={[styles.wishlistSummaryStrip, { backgroundColor: colors.card }]}>
@@ -1271,13 +1312,8 @@ function WishlistView({ items = WISHLIST_ITEMS, history = [], onRemove }) {
 
           {filtered.map((item) => (
             <View key={item.id} style={[styles.wishlistCard, { backgroundColor: colors.card }]}>
-              {/* Gradient emoji panel */}
-              <LinearGradient
-                colors={item.bg}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.wishlistCardBg}
-              >
+              {/* Emoji panel */}
+              <View style={[styles.wishlistCardBg, { backgroundColor: (item.bg && item.bg[0]) || '#7b2fcd' }]}>
                 {item.image_url ? (
                   <Image source={{ uri: item.image_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                 ) : (
@@ -1287,7 +1323,7 @@ function WishlistView({ items = WISHLIST_ITEMS, history = [], onRemove }) {
                 <View style={styles.wishlistRibbon}>
                   <Text style={styles.wishlistRibbonText}>{item.off}</Text>
                 </View>
-              </LinearGradient>
+              </View>
 
               {/* Content area */}
               <View style={styles.wishlistCardContent}>
@@ -1308,14 +1344,9 @@ function WishlistView({ items = WISHLIST_ITEMS, history = [], onRemove }) {
                     <Text style={[styles.wishlistCardPrice, { color: colors.text }]}>From {item.price}</Text>
                   </View>
                   <Pressable onPress={haptic} style={styles.wishlistGetBtn}>
-                    <LinearGradient
-                      colors={['#7b2fcd', '#c03b8f']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.wishlistGetBtnGrad}
-                    >
+                    <View style={styles.wishlistGetBtnGrad}>
                       <Text style={styles.wishlistGetBtnText}>Get Offer →</Text>
-                    </LinearGradient>
+                    </View>
                   </Pressable>
                 </View>
               </View>
@@ -1323,19 +1354,14 @@ function WishlistView({ items = WISHLIST_ITEMS, history = [], onRemove }) {
           ))}
 
           {/* Promo nudge */}
-          <LinearGradient
-            colors={['#1a237e', '#283593']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.wishlistPromo}
-          >
+          <View style={styles.wishlistPromo}>
             <View style={{ flex: 1 }}>
               <Text style={styles.wishlistPromoBadge}>🎉 EXCLUSIVE OFFER</Text>
               <Text style={styles.wishlistPromoTitle}>Extra 10% off</Text>
               <Text style={styles.wishlistPromoSub}>On your first wishlisted order today!</Text>
             </View>
             <Text style={{ fontSize: 44 }}>🎁</Text>
-          </LinearGradient>
+          </View>
 
           {history.length > 0 ? (
             <View style={[styles.wishlistHistoryCard, { backgroundColor: colors.card }]}> 
@@ -1401,15 +1427,10 @@ function ProfileView() {
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 32 }}
+      contentContainerStyle={{ paddingBottom: 110 }}
     >
-      {/* Gradient profile header */}
-      <LinearGradient
-        colors={['#7b2fcd', '#c03b8f']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.profileHeader}
-      >
+      {/* Profile header */}
+      <View style={styles.profileHeader}>
         <View style={styles.profileAvatarRing}>
           <Text style={{ fontSize: 46 }}>👤</Text>
         </View>
@@ -1441,7 +1462,7 @@ function ProfileView() {
             </Pressable>
           </>
         )}
-      </LinearGradient>
+      </View>
 
       {/* Stats row */}
       <View style={[styles.profileStatsRow, { backgroundColor: colors.statsRow }]}>
@@ -1508,13 +1529,13 @@ function LinkedStoresPage({ banner, onBack, onOpenStore }) {
 
   return (
     <View style={[styles.fullPageWrap, { backgroundColor: colors.bg }]}> 
-      <LinearGradient colors={['#7b2fcd', '#c03b8f']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.fullPageHeader}> 
+      <View style={styles.fullPageHeader}>
         <Pressable style={styles.fullPageBackBtn} onPress={onBack}>
           <Text style={styles.fullPageBackText}>‹ Back</Text>
         </Pressable>
         <Text style={styles.fullPageTitle}>Linked Stores</Text>
         <Text style={styles.fullPageSub}>{banner?.title || 'Deal of the Day'}</Text>
-      </LinearGradient>
+      </View>
 
       <ScrollView contentContainerStyle={{ padding: 14, gap: 10, paddingBottom: 20 }}>
         {linkedStores.length === 0 ? (
@@ -1548,7 +1569,7 @@ function StoreDetailsPage({ store, onBack }) {
 
   return (
     <View style={[styles.fullPageWrap, { backgroundColor: colors.bg }]}> 
-      <LinearGradient colors={['#7b2fcd', '#c03b8f']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.fullPageHeader}> 
+      <View style={styles.fullPageHeader}>
         <Pressable style={styles.fullPageBackBtn} onPress={onBack}>
           <Text style={styles.fullPageBackText}>‹ Back</Text>
         </Pressable>
@@ -1557,7 +1578,7 @@ function StoreDetailsPage({ store, onBack }) {
         </View>
         <Text style={styles.fullPageTitle}>{store.name}</Text>
         <Text style={styles.fullPageSub}>⭐ {store.rating || '—'} · {store.dist || '—'} · {store.area || 'Area'}</Text>
-      </LinearGradient>
+      </View>
 
       <ScrollView contentContainerStyle={{ padding: 14, gap: 12, paddingBottom: 20 }}>
         <View style={[styles.storeInfoCard, { backgroundColor: colors.card }]}> 
@@ -1843,9 +1864,9 @@ function ExploreMapView({ onStorePress, allStores, userLocation, interestMatched
         <ScrollView
           style={{ flex: 1, backgroundColor: colors.bg }}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ padding: 14, gap: 12, paddingBottom: 24 }}
+          contentContainerStyle={{ padding: 14, gap: 12, paddingBottom: 110 }}
         >
-          <Text style={[styles.mapListTitle, { color: colors.text }]}> 
+          <Text style={[styles.mapListTitle, { color: colors.text }]}>
             {visible.length} store{visible.length !== 1 ? 's' : ''} nearby
           </Text>
 
@@ -1880,7 +1901,7 @@ function ExploreMapView({ onStorePress, allStores, userLocation, interestMatched
                 </View>
                 <Text style={[styles.mapListMeta, { color: colors.subtext }]}>⭐ {s.rating} · {s.dist} · {s.area}</Text>
                 <View style={styles.mapListTagRow}>
-                  <View style={[styles.mapListTag, { backgroundColor: dark ? '#2a1a45' : '#f0ebff' }]}>
+                  <View style={[styles.mapListTag, { backgroundColor: dark ? '#2a1a45' : '#f3e8ff' }]}>
                     <Text style={[styles.mapListTagText, { color: dark ? '#c4b5fd' : '#7b2fcd' }]}>{s.tag}</Text>
                   </View>
                   {s.deals?.length > 0 && (
@@ -2010,14 +2031,9 @@ function WalkthroughOverlay({ onDone }) {
                 <Text style={styles.wtSkipText}>Skip</Text>
               </Pressable>
               <Pressable onPress={next}>
-                <LinearGradient
-                  colors={['#7b2fcd', '#c03b8f']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.wtNextBtn}
-                >
+                <View style={styles.wtNextBtn}>
                   <Text style={styles.wtNextText}>{isLast ? 'Done ✓' : 'Next →'}</Text>
-                </LinearGradient>
+                </View>
               </Pressable>
             </View>
           </View>
@@ -2058,6 +2074,7 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
   const [banners, setBanners]           = useState([]);
   const [flashDeals, setFlashDeals]     = useState([]);
   const [dealCards, setDealCards]       = useState([]);
+  const [trendingItems, setTrendingItems] = useState([]);
   const [popularStores, setPopularStores] = useState([]);
   const [nearbyStores, setNearbyStores]   = useState([]);
   const [stories, setStories]             = useState([]);
@@ -2349,6 +2366,19 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
       setDealCards([]);
     }
 
+    if (data.trending_items?.length) {
+      setTrendingItems(data.trending_items.map(t => ({
+        id: String(t.id),
+        title: t.title,
+        emoji: t.emoji,
+        image_url: t.image_url || null,
+        color: [t.color_start, t.color_end],
+        linked_stores: (t.linked_stores || []).map((s, idx) => normalize(s, idx)).filter((s) => s.name),
+      })));
+    } else {
+      setTrendingItems([]);
+    }
+
     const interestRaw =
       data.interest_matched_stores ||
       data.interest_stores ||
@@ -2500,13 +2530,8 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
     <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
       <StatusBar style="light" />
 
-      {/* ── Gradient Top Bar ── */}
-      <LinearGradient
-        colors={['#7b2fcd', '#c03b8f']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.topBar}
-      >
+      {/* ── Top Bar ── */}
+      <View style={styles.topBar}>
         <View style={styles.locationRow}>
           <Pressable onPress={() => { haptic(); startLocationWatch(); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={styles.locPin}>{locLoading ? '⏳' : '📍'}</Text>
@@ -2528,7 +2553,7 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
             <Text style={{ fontSize: 16 }}>👤</Text>
           </Pressable>
         </View>
-      </LinearGradient>
+      </View>
 
       {/* ── Verify phone reminder ── */}
       {phoneVerified === false && (
@@ -2539,7 +2564,7 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
       )}
 
       {/* ── Search (floats below gradient) ── */}
-      {activeTab !== 'profile' && activeTab !== 'wishlist' && activeTab !== 'explore' && activeTab !== 'offers' && (
+      {activeTab !== 'profile' && activeTab !== 'wishlist' && activeTab !== 'explore' && activeTab !== 'offers' && activeTab !== 'trending' && (
       <View style={[styles.searchOuter, { backgroundColor: themeColors.searchBg, borderBottomColor: themeColors.border }]}>
         <View style={[styles.searchWrap, { backgroundColor: themeColors.searchInner, borderColor: themeColors.searchBorder }]}>
           <Text style={styles.searchIconText}>🔍</Text>
@@ -2571,6 +2596,13 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
         />
       )}
       {activeTab === 'profile' && <ProfileView />}
+      {activeTab === 'trending' && (
+        <TrendingView
+          items={trendingItems}
+          onOpenStore={(store) => openStore(store, 'trending-direct')}
+          onOpenMultipleStores={(item) => setBannerStorePicker(item)}
+        />
+      )}
       {(activeTab === 'explore' || activeTab === 'offers') && (
         <ExploreMapView
           onStorePress={(s) => openStore(s, 'explore-map')}
@@ -2585,16 +2617,16 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
       )}
 
       {/* ── Scrollable Content ── */}
-      {activeTab !== 'profile' && activeTab !== 'wishlist' && activeTab !== 'explore' && activeTab !== 'offers' && (
+      {activeTab !== 'profile' && activeTab !== 'wishlist' && activeTab !== 'explore' && activeTab !== 'offers' && activeTab !== 'trending' && (
       <ScrollView
         style={{ flex: 1, backgroundColor: themeColors.bg }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: 110 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#7b2fcd', '#c03b8f']}
+            colors={['#7b2fcd']}
             tintColor="#7b2fcd"
           />
         }
@@ -2636,12 +2668,7 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
         {isStoriesVisible && <StoryRow stories={stories} onStoryPress={openStory} seenStoryIds={seenStoryIds} />}
 
         {/* Greeting Strip */}
-        <LinearGradient
-          colors={['#ede9fe', '#fce7f3']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.greetingStrip}
-        >
+        <View style={styles.greetingStrip}>
           <View>
             <Text style={styles.greetingHi}>👋 Welcome back!</Text>
             <Text style={styles.greetingTagline}>Best deals near Lawspet today</Text>
@@ -2651,7 +2678,7 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
             <Text style={styles.greetingStreakNum}>3</Text>
             <Text style={styles.greetingStreakLabel}>Day Streak</Text>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Categories */}
         <View style={[styles.categorySection, { backgroundColor: themeColors.card }]}>
@@ -3039,12 +3066,12 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
         })()}
 
         {/* Footer */}
-        <LinearGradient colors={['#f0e9ff', '#fce4ec']} style={styles.footerWrap}>
+        <View style={styles.footerWrap}>
           <Text style={styles.footerTagline}>Good to know Local Deals</Text>
           <Text style={styles.footerHashtag}>#supportlocal</Text>
           <Image source={require('../assets/logo.png')} style={styles.footerLogo} resizeMode="contain" />
           <Text style={styles.footerCredit}>Crafted with love in Puducherry, India 🇮🇳</Text>
-        </LinearGradient>
+        </View>
           </>
         )}
       </ScrollView>
@@ -3108,7 +3135,7 @@ const styles = StyleSheet.create({
 
   /* Full-page navigation views */
   fullPageWrap: { flex: 1 },
-  fullPageHeader: { paddingTop: 54, paddingHorizontal: 16, paddingBottom: 14 },
+  fullPageHeader: { paddingTop: 54, paddingHorizontal: 16, paddingBottom: 14, backgroundColor: '#7b2fcd' },
   fullPageBackBtn: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(255,255,255,0.18)',
@@ -3177,6 +3204,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 54,
     paddingBottom: 14,
+    backgroundColor: '#7b2fcd',
   },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   locPin: { fontSize: 20, color: '#ffffff' },
@@ -3224,7 +3252,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 14, fontFamily: 'Nunito_400Regular', color: '#333333' },
   filterBtn: {
     width: 42, height: 42, borderRadius: 12,
-    backgroundColor: '#f0ebff',
+    backgroundColor: '#f3e8ff',
     justifyContent: 'center', alignItems: 'center',
   },
   filterIcon: { fontSize: 18 },
@@ -3236,7 +3264,7 @@ const styles = StyleSheet.create({
   catIconBox: {
     width: 58, height: 58, borderRadius: 29,
     justifyContent: 'center', alignItems: 'center', marginBottom: 6,
-    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5, elevation: 3,
+    shadowColor: '#1a1a2e', shadowOpacity: 0.1, shadowRadius: 5, elevation: 3,
   },
   catEmoji: { fontSize: 26 },
   catLabel: { fontSize: 11, fontFamily: 'Nunito_600SemiBold', color: '#444444', textAlign: 'center', lineHeight: 14 },
@@ -3247,12 +3275,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 14, paddingVertical: 9,
     borderRadius: 50,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+    shadowColor: '#1a1a2e', shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
   catPillActive: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 14, paddingVertical: 9,
     borderRadius: 50,
+    backgroundColor: '#7b2fcd',
     shadowColor: '#7b2fcd', shadowOpacity: 0.25, shadowRadius: 6, elevation: 4,
   },
   catPillLabel: { fontSize: 13, fontFamily: 'Nunito_600SemiBold', color: '#444444' },
@@ -3268,7 +3297,7 @@ const styles = StyleSheet.create({
   sectionSubtitle: { fontSize: 11.5, fontFamily: 'Nunito_400Regular', color: '#888888', marginTop: 1 },
   viewAll: { fontSize: 13, fontFamily: 'Nunito_700Bold', color: '#7b2fcd' },
   viewAllBtn: {
-    backgroundColor: '#f0ebff', borderRadius: 20,
+    backgroundColor: '#f3e8ff', borderRadius: 20,
     paddingHorizontal: 12, paddingVertical: 6,
   },
 
@@ -3378,7 +3407,7 @@ const styles = StyleSheet.create({
   moreDealsSection: {
     marginHorizontal: 14, marginTop: 20,
     backgroundColor: '#ffffff', borderRadius: 16, padding: 16,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
+    shadowColor: '#1a1a2e', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
     gap: 12,
   },
   moreDealsTitle: { fontSize: 16, fontFamily: 'Nunito_800ExtraBold', color: '#111111' },
@@ -3386,7 +3415,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: '#ddd', borderRadius: 20,
     paddingHorizontal: 14, paddingVertical: 7, backgroundColor: '#fafafa',
   },
-  mealTagActive: { borderColor: '#7b2fcd', backgroundColor: '#f0ebff' },
+  mealTagActive: { borderColor: '#7b2fcd', backgroundColor: '#f3e8ff' },
   mealTagText: { fontSize: 13, fontFamily: 'Nunito_600SemiBold', color: '#555555' },
   mealTagTextActive: { color: '#7b2fcd', fontFamily: 'Nunito_700Bold' },
 
@@ -3394,7 +3423,7 @@ const styles = StyleSheet.create({
   popularCard: {
     width: 156, backgroundColor: '#ffffff', borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.09, shadowRadius: 10, elevation: 4,
+    shadowColor: '#1a1a2e', shadowOpacity: 0.09, shadowRadius: 10, elevation: 4,
   },
   popularImgBox: { width: '100%', height: 110, justifyContent: 'center', alignItems: 'center' },
   popularEmoji: { fontSize: 44 },
@@ -3428,7 +3457,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: '#1a1a2e',
     shadowOpacity: 0.09,
     shadowRadius: 10,
     elevation: 4,
@@ -3452,7 +3481,7 @@ const styles = StyleSheet.create({
   nearbyName: { fontSize: 13, fontFamily: 'Nunito_700Bold', color: '#111111', marginBottom: 2 },
   nearbyDist: { fontSize: 10, fontFamily: 'Nunito_400Regular', color: '#888888', marginBottom: 6 },
   nearbyTagPill: {
-    backgroundColor: '#f0ebff',
+    backgroundColor: '#f3e8ff',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -3471,7 +3500,7 @@ const styles = StyleSheet.create({
   nearbyRatingText: { fontSize: 10, fontFamily: 'Nunito_700Bold', color: '#ffffff' },
 
   /* Footer */
-  footerWrap: { marginTop: 20, paddingVertical: 30, paddingHorizontal: 20, alignItems: 'center', gap: 6 },
+  footerWrap: { marginTop: 20, paddingVertical: 30, paddingHorizontal: 20, alignItems: 'center', gap: 6, backgroundColor: '#f3e8ff' },
   footerTagline: { fontSize: 18, fontFamily: 'Nunito_800ExtraBold', color: '#7b2fcd', textAlign: 'center' },
   footerHashtag: { fontSize: 13, fontFamily: 'Nunito_400Regular', color: '#a855f7' },
   footerLogo: { width: 160, height: 50, marginVertical: 8 },
@@ -3487,6 +3516,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: '#f3e8ff',
   },
   greetingHi: { fontSize: 15, fontFamily: 'Nunito_800ExtraBold', color: '#4c1d95' },
   greetingTagline: { fontSize: 12, fontFamily: 'Nunito_400Regular', color: '#7c3aed', marginTop: 2 },
@@ -3503,42 +3533,55 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: '#f3e8ff',
   },
   offerStripBadge: {
     fontSize: 10,
     fontFamily: 'Nunito_700Bold',
-    color: 'rgba(255,255,255,0.7)',
+    color: '#8b6bb8',
     letterSpacing: 0.6,
     marginBottom: 4,
   },
   offerStripTitle: {
     fontSize: 19,
     fontFamily: 'Nunito_800ExtraBold',
-    color: '#ffffff',
+    color: '#6b21a8',
     marginBottom: 4,
   },
   offerStripSub: {
     fontSize: 12,
     fontFamily: 'Nunito_400Regular',
-    color: 'rgba(255,255,255,0.85)',
+    color: '#8b6bb8',
   },
 
   /* Tab Bar */
-  tabBar: {
-    flexDirection: 'row', backgroundColor: '#ffffff',
-    borderTopWidth: 1, borderTopColor: '#eeeeee',
-    paddingBottom: 28, paddingTop: 8,
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, elevation: 12,
+  floatTabBarWrap: {
+    position: 'absolute',
+    left: 20, right: 20, bottom: 28,
+    alignItems: 'center',
   },
-  tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  tabActivePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
+  floatTabBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 8,
+    shadowColor: '#1a1a2e', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 12,
   },
-  tabEmojiActive: { fontSize: 15, color: '#ffffff' },
-  tabLabelActive: { fontSize: 12, fontFamily: 'Nunito_700Bold', color: '#ffffff' },
-  tabEmoji: { fontSize: 22, color: '#888888' },
-  tabLabel: { fontSize: 10, fontFamily: 'Nunito_400Regular', color: '#999999' },
+  floatTabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 5 },
+  floatTabCenterSpacer: { width: 64 },
+  floatTabDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'transparent' },
+  floatTabDotActive: { backgroundColor: '#7b2fcd' },
+  floatTabCenterBtn: {
+    position: 'absolute',
+    top: -24,
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: '#7b2fcd',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#7b2fcd', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 10,
+  },
 
   /* Store Detail Sheet */
   sheetOverlay: {
@@ -3553,7 +3596,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 36,
-    shadowColor: '#000',
+    shadowColor: '#1a1a2e',
     shadowOpacity: 0.18,
     shadowRadius: 20,
     elevation: 25,
@@ -3602,7 +3645,7 @@ const styles = StyleSheet.create({
   sheetDealName: { fontSize: 13, fontFamily: 'Nunito_700Bold', color: '#111111', marginBottom: 2 },
   sheetDealPrice: { fontSize: 12, fontFamily: 'Nunito_400Regular', color: '#888888' },
   sheetDealBadge: {
-    backgroundColor: '#f0ebff', borderRadius: 8,
+    backgroundColor: '#f3e8ff', borderRadius: 8,
     paddingHorizontal: 10, paddingVertical: 5,
   },
   sheetDealOff: { fontSize: 12, fontFamily: 'Nunito_700Bold', color: '#7b2fcd' },
@@ -3614,7 +3657,7 @@ const styles = StyleSheet.create({
   sheetCtaRow: { flexDirection: 'row', gap: 10, marginTop: 16, alignItems: 'center' },
   sheetShareBtn: {
     width: 52, height: 52, borderRadius: 16,
-    backgroundColor: '#f0ebff',
+    backgroundColor: '#f3e8ff',
     justifyContent: 'center', alignItems: 'center',
   },
   sheetShareIcon: { fontSize: 22 },
@@ -3663,6 +3706,7 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     alignItems: 'center',
     gap: 4,
+    backgroundColor: '#7b2fcd',
   },
   profileAvatarRing: {
     width: 90, height: 90, borderRadius: 45,
@@ -3701,7 +3745,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 16,
     paddingVertical: 18,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    shadowColor: '#1a1a2e', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
   profileStat: { flex: 1, alignItems: 'center', gap: 3 },
   profileStatNum: { fontSize: 20, fontFamily: 'Nunito_800ExtraBold', color: '#7b2fcd' },
@@ -3713,7 +3757,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    shadowColor: '#1a1a2e', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
   profileMenuItem: {
     flexDirection: 'row', alignItems: 'center',
@@ -3745,6 +3789,7 @@ const styles = StyleSheet.create({
   wishlistHeader: {
     paddingTop: 28, paddingBottom: 14,
     paddingHorizontal: 20, gap: 14,
+    backgroundColor: '#7b2fcd',
   },
   wishlistHeaderTop: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -3777,11 +3822,27 @@ const styles = StyleSheet.create({
   wishlistEmptyTitle: { fontSize: 20, fontFamily: 'Nunito_800ExtraBold', color: '#333333' },
   wishlistEmptySub: { fontSize: 13, fontFamily: 'Nunito_400Regular', color: '#999999', textAlign: 'center', lineHeight: 20 },
 
+  trendingHeader: { paddingTop: 54, paddingHorizontal: 20, paddingBottom: 16 },
+  trendingHeaderTitle: { fontSize: 24, fontFamily: 'Nunito_800ExtraBold', color: '#14141a' },
+  trendingHeaderSub: { fontSize: 13, fontFamily: 'Nunito_400Regular', color: '#8b8b96', marginTop: 2 },
+  trendingCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    borderRadius: 20, padding: 12,
+    shadowColor: '#1a1a2e', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.06, shadowRadius: 24, elevation: 3,
+  },
+  trendingCardIcon: {
+    width: 56, height: 56, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+  },
+  trendingCardTitle: { fontSize: 16, fontFamily: 'Nunito_800ExtraBold' },
+  trendingCardMeta: { fontSize: 12, fontFamily: 'Nunito_400Regular', color: '#8b8b96', marginTop: 3 },
+  trendingCardArrow: { fontSize: 22, color: '#c2c2cc', fontWeight: '300' },
+
   wishlistSummaryStrip: {
     flexDirection: 'row',
     backgroundColor: '#ffffff',
     borderRadius: 16, paddingVertical: 16,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    shadowColor: '#1a1a2e', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
   wishlistSummaryItem: { flex: 1, alignItems: 'center', gap: 3 },
   wishlistSummaryNum: { fontSize: 18, fontFamily: 'Nunito_800ExtraBold', color: '#7b2fcd' },
@@ -3820,24 +3881,25 @@ const styles = StyleSheet.create({
   wishlistSavedLabel: { fontSize: 11, fontFamily: 'Nunito_400Regular', color: '#aaaaaa', marginBottom: 2 },
   wishlistCardPrice: { fontSize: 14, fontFamily: 'Nunito_700Bold', color: '#111111' },
   wishlistGetBtn: { borderRadius: 12, overflow: 'hidden' },
-  wishlistGetBtnGrad: { paddingHorizontal: 18, paddingVertical: 10 },
+  wishlistGetBtnGrad: { paddingHorizontal: 18, paddingVertical: 10, backgroundColor: '#7b2fcd' },
   wishlistGetBtnText: { fontSize: 13, fontFamily: 'Nunito_700Bold', color: '#ffffff' },
 
   wishlistPromo: {
     borderRadius: 20, padding: 18,
     flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#f3e8ff',
   },
   wishlistPromoBadge: {
     fontSize: 10, fontFamily: 'Nunito_700Bold',
-    color: 'rgba(255,255,255,0.7)', letterSpacing: 0.6, marginBottom: 4,
+    color: '#8b6bb8', letterSpacing: 0.6, marginBottom: 4,
   },
-  wishlistPromoTitle: { fontSize: 18, fontFamily: 'Nunito_800ExtraBold', color: '#ffffff', marginBottom: 3 },
-  wishlistPromoSub: { fontSize: 12, fontFamily: 'Nunito_400Regular', color: 'rgba(255,255,255,0.85)' },
+  wishlistPromoTitle: { fontSize: 18, fontFamily: 'Nunito_800ExtraBold', color: '#6b21a8', marginBottom: 3 },
+  wishlistPromoSub: { fontSize: 12, fontFamily: 'Nunito_400Regular', color: '#8b6bb8' },
   wishlistHistoryCard: {
     borderRadius: 16,
     padding: 14,
     gap: 10,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    shadowColor: '#1a1a2e', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
   },
   wishlistHistoryTitle: { fontSize: 15, fontFamily: 'Nunito_800ExtraBold' },
   wishlistHistoryRow: {
@@ -3864,11 +3926,12 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
     overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20, elevation: 20,
+    shadowColor: '#1a1a2e', shadowOpacity: 0.2, shadowRadius: 20, elevation: 20,
   },
   notifsHeaderGrad: {
     paddingTop: 54, paddingBottom: 14,
     paddingHorizontal: 18, gap: 12,
+    backgroundColor: '#7b2fcd',
   },
   notifsHeaderTop: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
@@ -3908,7 +3971,7 @@ const styles = StyleSheet.create({
   notifRow: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
     backgroundColor: '#ffffff', borderRadius: 16, padding: 14,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+    shadowColor: '#1a1a2e', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
   notifRowUnread: {
     backgroundColor: '#faf5ff',
@@ -3971,7 +4034,7 @@ const styles = StyleSheet.create({
   },
   wtIconBubble: {
     width: 56, height: 56, borderRadius: 16,
-    backgroundColor: '#f0ebff',
+    backgroundColor: '#f3e8ff',
     justifyContent: 'center', alignItems: 'center',
   },
   wtTitle: { fontSize: 17, fontFamily: 'Nunito_800ExtraBold', color: '#111111', marginBottom: 5 },
@@ -3986,7 +4049,7 @@ const styles = StyleSheet.create({
   wtBtns: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   wtSkipBtn: { paddingHorizontal: 12, paddingVertical: 8 },
   wtSkipText: { fontSize: 13, fontFamily: 'Nunito_600SemiBold', color: '#aaaaaa' },
-  wtNextBtn: { borderRadius: 12, paddingHorizontal: 18, paddingVertical: 10 },
+  wtNextBtn: { borderRadius: 12, paddingHorizontal: 18, paddingVertical: 10, backgroundColor: '#7b2fcd' },
   wtNextText: { fontSize: 14, fontFamily: 'Nunito_700Bold', color: '#ffffff' },
 
   /* Explore Map View */
@@ -4003,7 +4066,7 @@ const styles = StyleSheet.create({
     width: 42, height: 42, borderRadius: 21,
     backgroundColor: '#fff',
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6, elevation: 6,
+    shadowColor: '#1a1a2e', shadowOpacity: 0.18, shadowRadius: 6, elevation: 6,
     zIndex: 10,
   },
   recenterBtnFullScreen: {
@@ -4015,7 +4078,7 @@ const styles = StyleSheet.create({
     width: 42, height: 42, borderRadius: 21,
     backgroundColor: '#fff',
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6, elevation: 6,
+    shadowColor: '#1a1a2e', shadowOpacity: 0.18, shadowRadius: 6, elevation: 6,
     zIndex: 10,
   },
   mapExpandBtnFullScreen: {
@@ -4028,26 +4091,27 @@ const styles = StyleSheet.create({
     color: '#222222',
   },
   mapOverlayIconBtn: {
-    backgroundColor: 'rgba(20,20,28,0.92)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: '#ececf2',
+    shadowColor: '#1a1a2e', shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
   },
   mapOverlayIconText: {
-    color: '#ffffff',
+    color: '#14141a',
   },
   mapMarkerBubble: {
     width: 40, height: 40, borderRadius: 20,
     justifyContent: 'center', alignItems: 'center',
     borderWidth: 2.5, borderColor: '#ffffff',
-    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 5, elevation: 8,
+    shadowColor: '#1a1a2e', shadowOpacity: 0.3, shadowRadius: 5, elevation: 8,
   },
   mapMarkerSelected: {
-    borderColor: '#c03b8f', borderWidth: 3,
+    borderColor: '#6b21a8', borderWidth: 3,
     transform: [{ scale: 1.2 }],
   },
   mapCallout: {
     borderRadius: 14, padding: 12, minWidth: 150,
-    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 10, elevation: 12,
+    shadowColor: '#1a1a2e', shadowOpacity: 0.18, shadowRadius: 10, elevation: 12,
   },
   mapCalloutName: { fontSize: 14, fontFamily: 'Nunito_800ExtraBold', marginBottom: 3 },
   mapCalloutMeta: { fontSize: 12, fontFamily: 'Nunito_400Regular', color: '#888888', marginBottom: 6 },
@@ -4056,7 +4120,7 @@ const styles = StyleSheet.create({
   mapListCardSelected: {
     borderWidth: 1.5, borderColor: '#7b2fcd',
   },
-  mapFilterBar: { shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, elevation: 3 },
+  mapFilterBar: { shadowColor: '#1a1a2e', shadowOpacity: 0.06, shadowRadius: 4, elevation: 3 },
   mapFilterBarFullScreen: {
     position: 'absolute',
     top: 154,
@@ -4065,7 +4129,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     zIndex: 35,
     elevation: 35,
-    shadowColor: '#000',
+    shadowColor: '#1a1a2e',
     shadowOpacity: 0.2,
     shadowRadius: 10,
   },
@@ -4081,20 +4145,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: 'rgba(20,20,28,0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: '#ffffff',
+    shadowColor: '#1a1a2e', shadowOpacity: 0.1, shadowRadius: 12, elevation: 36,
     zIndex: 36,
-    elevation: 36,
   },
   mapHudTitle: {
-    color: '#ffffff',
+    color: '#14141a',
     fontSize: 14,
     fontFamily: 'Nunito_800ExtraBold',
     marginBottom: 2,
   },
   mapHudSub: {
-    color: 'rgba(255,255,255,0.8)',
+    color: '#8b8b96',
     fontSize: 11,
     fontFamily: 'Nunito_600SemiBold',
   },
@@ -4110,7 +4172,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderColor: '#ffffff',
   },
-  mapFilterChipActive: { backgroundColor: '#f0ebff', borderColor: '#7b2fcd' },
+  mapFilterChipActive: { backgroundColor: '#f3e8ff', borderColor: '#7b2fcd' },
   mapFilterText: { fontSize: 13, fontFamily: 'Nunito_600SemiBold', color: '#888888' },
   mapFilterTextFullScreen: { color: 'rgba(255,255,255,0.86)' },
   mapFilterTextActiveFullScreen: { color: '#1a1a1a' },
@@ -4120,7 +4182,7 @@ const styles = StyleSheet.create({
   mapListCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     borderRadius: 16, padding: 12,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    shadowColor: '#1a1a2e', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
   mapListIconBox: {
     width: 64, height: 64, borderRadius: 16,
