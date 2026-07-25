@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -11,19 +12,44 @@ import {
   Vibration,
   View,
 } from 'react-native';
-import { API_BASE_URL } from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { loginWithEmail, registerWithEmail } from '../services/api';
 
 function haptic() { Vibration.vibrate(8); }
 
-export default function LoginScreen({ onPhoneSubmit, onEmailTab, onGuestLogin }) {
-  const [mobileNumber, setMobileNumber] = useState('');
+export default function EmailAuthScreen({ onAuthed, onPhoneTab }) {
+  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleContinue = () => {
+  const isSignup = mode === 'signup';
+  const isValid = email.includes('@') && password.length >= 8 && (!isSignup || name.trim().length > 0);
+
+  const handleSubmit = async () => {
     haptic();
-    onPhoneSubmit?.(mobileNumber);
-  };
+    setError('');
+    setLoading(true);
+    try {
+      const data = isSignup
+        ? await registerWithEmail(name.trim(), email.trim(), password)
+        : await loginWithEmail(email.trim(), password);
 
-  const isValid = mobileNumber.length === 10;
+      if (data.success) {
+        await AsyncStorage.setItem('auth_token', data.token);
+        await AsyncStorage.setItem('user', JSON.stringify(data.user));
+        onAuthed?.(data.user);
+      } else {
+        setError(data.message || 'Something went wrong.');
+      }
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Could not reach server. Check your connection.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -43,49 +69,73 @@ export default function LoginScreen({ onPhoneSubmit, onEmailTab, onGuestLogin })
 
         <View style={styles.card}>
           <View style={styles.tabRow}>
-            <View style={[styles.tab, styles.tabActive]}>
-              <Text style={[styles.tabText, styles.tabTextActive]}>Phone</Text>
-            </View>
-            <Pressable style={styles.tab} onPress={() => { haptic(); onEmailTab?.(); }}>
-              <Text style={styles.tabText}>Email</Text>
+            <Pressable style={styles.tab} onPress={() => { haptic(); onPhoneTab?.(); }}>
+              <Text style={styles.tabText}>Phone</Text>
             </Pressable>
+            <View style={[styles.tab, styles.tabActive]}>
+              <Text style={[styles.tabText, styles.tabTextActive]}>Email</Text>
+            </View>
           </View>
 
-          <Text style={styles.title}>Welcome</Text>
+          <Text style={styles.title}>{isSignup ? 'Create account' : 'Welcome back'}</Text>
           <Text style={styles.subtitle}>
-            Enter your mobile number to get started.
+            {isSignup ? 'Sign up with your email to get started.' : 'Log in with your email and password.'}
           </Text>
 
-          <View style={styles.inputWrapper}>
-            <Text style={styles.inputPrefix}>+91</Text>
+          {isSignup && (
             <TextInput
-              value={mobileNumber}
-              onChangeText={(value) =>
-                setMobileNumber(value.replace(/[^0-9]/g, '').slice(0, 10))
-              }
-              keyboardType="number-pad"
-              maxLength={10}
-              placeholder="Mobile number"
+              value={name}
+              onChangeText={setName}
+              placeholder="Full name"
               placeholderTextColor="#a3a3ad"
-              style={styles.mobileInput}
+              style={styles.input}
             />
-            {isValid && <Text style={styles.checkMark}>✓</Text>}
-          </View>
+          )}
+
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="Email address"
+            placeholderTextColor="#a3a3ad"
+            style={styles.input}
+          />
+
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            placeholder="Password (min 8 characters)"
+            placeholderTextColor="#a3a3ad"
+            style={styles.input}
+          />
+
+          {!!error && <Text style={styles.errorText}>{error}</Text>}
 
           <Pressable
-            style={[styles.primaryButton, !isValid && styles.primaryButtonDisabled]}
-            disabled={!isValid}
-            onPress={handleContinue}
+            style={[styles.primaryButton, (!isValid || loading) && styles.primaryButtonDisabled]}
+            disabled={!isValid || loading}
+            onPress={handleSubmit}
           >
-            <Text style={styles.primaryButtonText}>Continue</Text>
+            {loading
+              ? <ActivityIndicator color="#ffffff" />
+              : <Text style={styles.primaryButtonText}>{isSignup ? 'Sign Up' : 'Log In'}</Text>
+            }
           </Pressable>
 
-          <Pressable style={styles.guestWrap} onPress={() => { haptic(); onGuestLogin?.(); }}>
-            <Text style={styles.guestText}>Continue as Guest</Text>
+          <Pressable
+            style={styles.switchWrap}
+            onPress={() => { haptic(); setError(''); setMode(isSignup ? 'login' : 'signup'); }}
+          >
+            <Text style={styles.switchText}>
+              {isSignup ? 'Already have an account? ' : "Don't have an account? "}
+              <Text style={styles.switchTextBold}>{isSignup ? 'Log in' : 'Sign up'}</Text>
+            </Text>
           </Pressable>
         </View>
-
-        <Text style={styles.apiText}>{API_BASE_URL}</Text>
       </KeyboardAvoidingView>
 
       <View style={styles.footer}>
@@ -173,33 +223,24 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  input: {
     backgroundColor: '#f7f7fb',
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: '#ececf2',
     paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  inputPrefix: {
-    fontSize: 16,
-    fontFamily: 'Nunito_700Bold',
-    color: '#8b8b96',
-    marginRight: 10,
-  },
-  mobileInput: {
-    flex: 1,
     paddingVertical: 16,
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: 'Nunito_600SemiBold',
     color: '#14141a',
+    marginBottom: 14,
   },
-  checkMark: {
-    fontSize: 18,
-    color: '#22c55e',
-    fontFamily: 'Nunito_700Bold',
+
+  errorText: {
+    color: '#e53935',
+    fontSize: 13,
+    fontFamily: 'Nunito_600SemiBold',
+    marginBottom: 8,
   },
 
   primaryButton: {
@@ -225,19 +266,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito_700Bold',
   },
 
-  guestWrap: { alignItems: 'center', paddingTop: 18 },
-  guestText: {
+  switchWrap: { alignItems: 'center', paddingTop: 18 },
+  switchText: {
     fontSize: 14,
     fontFamily: 'Nunito_600SemiBold',
     color: '#8b8b96',
   },
-
-  apiText: {
-    fontSize: 11,
-    fontFamily: 'Nunito_400Regular',
-    color: '#c2c2cc',
-    textAlign: 'center',
-    marginTop: 16,
+  switchTextBold: {
+    color: '#7b2fcd',
   },
 
   footer: {

@@ -5,6 +5,7 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import { useVideoPlayer, VideoView } from 'expo-video';
 import MapView, { Marker, Callout, PROVIDER_DEFAULT } from 'react-native-maps';
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
@@ -2043,6 +2044,116 @@ function WalkthroughOverlay({ onDone }) {
   );
 }
 
+/* ─── Location picker (fixed center-pin map) ───────────────────────────── */
+function LocationPickerMap({ initialLat, initialLng, onConfirm, onCancel }) {
+  const mapRef = useRef(null);
+  const regionRef = useRef({
+    latitude: initialLat ?? USER_LOCATION.latitude,
+    longitude: initialLng ?? USER_LOCATION.longitude,
+  });
+  const [confirming, setConfirming] = useState(false);
+
+  const handleConfirm = async () => {
+    haptic();
+    setConfirming(true);
+    const { latitude, longitude } = regionRef.current;
+    try {
+      const [place] = await Location.reverseGeocodeAsync({ latitude, longitude });
+      onConfirm({
+        lat: latitude,
+        lng: longitude,
+        city: place?.city || place?.district || place?.subregion || 'Your Location',
+        state: place?.region || '',
+      });
+    } catch (_) {
+      onConfirm({ lat: latitude, lng: longitude, city: 'Your Location', state: '' });
+    }
+  };
+
+  return (
+    <View style={styles.locPickerContainer}>
+      <StatusBar style="dark" />
+      <MapView
+        ref={mapRef}
+        provider={PROVIDER_DEFAULT}
+        style={styles.locPickerMap}
+        initialRegion={{
+          latitude: regionRef.current.latitude,
+          longitude: regionRef.current.longitude,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        }}
+        onRegionChangeComplete={(region) => { regionRef.current = region; }}
+      />
+
+      {/* Fixed center pin — the map pans underneath this, tip points at the true center */}
+      <View pointerEvents="none" style={styles.locPickerPinWrap}>
+        <Text style={styles.locPickerPinEmoji}>📍</Text>
+      </View>
+
+      <Pressable style={styles.locPickerBackBtn} onPress={() => { haptic(); onCancel(); }}>
+        <Text style={styles.locPickerBackText}>← Back</Text>
+      </Pressable>
+
+      <View style={styles.locPickerBottomBar}>
+        <Text style={styles.locPickerHint}>Move the map to place the pin on your location</Text>
+        <Pressable
+          style={[styles.locPickerConfirmBtn, confirming && styles.locPickerConfirmBtnDisabled]}
+          disabled={confirming}
+          onPress={handleConfirm}
+        >
+          {confirming
+            ? <ActivityIndicator color="#ffffff" />
+            : <Text style={styles.locPickerConfirmText}>Confirm this location</Text>
+          }
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+/* ─── Location gate — blocks Home until a location is chosen ──────────── */
+function LocationGateView({ locLoading, onUseMyLocation, onLocationPicked }) {
+  const [showMap, setShowMap] = useState(false);
+
+  if (showMap) {
+    return (
+      <LocationPickerMap
+        onConfirm={(loc) => { setShowMap(false); onLocationPicked(loc); }}
+        onCancel={() => setShowMap(false)}
+      />
+    );
+  }
+
+  return (
+    <View style={styles.locGateContainer}>
+      <StatusBar style="dark" />
+      <View style={styles.locGateCard}>
+        <Text style={styles.locGateEmoji}>📍</Text>
+        {locLoading ? (
+          <>
+            <ActivityIndicator color="#7b2fcd" style={{ marginTop: 14 }} />
+            <Text style={styles.locGateSubtitle}>Finding your location…</Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.locGateTitle}>Where should we find deals for you?</Text>
+            <Text style={styles.locGateSubtitle}>
+              We need your location to show stores and offers near you.
+            </Text>
+            <Pressable style={styles.locGatePrimaryBtn} onPress={() => { haptic(); onUseMyLocation(); }}>
+              <Text style={styles.locGatePrimaryText}>Use My Location</Text>
+            </Pressable>
+            <Pressable style={styles.locGateSecondaryBtn} onPress={() => { haptic(); setShowMap(true); }}>
+              <Text style={styles.locGateSecondaryText}>Set Location on Map</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
+    </View>
+  );
+}
+
 /* ─── Main Screen ───────────────────────────────────────── */
 export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
   const [activeTab, setActiveTab] = useState('home');
@@ -2453,8 +2564,8 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        // Fallback: still fetch home data, backend can use last known user location.
-        getHomeData().then(data => applyHomeData(data, null, null)).catch(() => {});
+        // Permission denied — leave userLocation unset so the location gate
+        // stays up and offers the "Set Location on Map" fallback instead.
         setLocLoading(false);
         return;
       }
@@ -2475,10 +2586,17 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
         }
       );
     } catch (_) {
-      // If GPS fails, still try loading via backend fallback coordinates.
-      getHomeData().then(data => applyHomeData(data, null, null)).catch(() => {});
+      // GPS failed — leave userLocation unset so the location gate stays up
+      // and offers the "Set Location on Map" fallback instead.
       setLocLoading(false);
     }
+  };
+
+  // Called when the user confirms a location via the manual map picker
+  const handleLocationPicked = ({ lat, lng, city, state }) => {
+    setUserLocation({ lat, lng, city, state });
+    lastLatLngRef.current = { lat, lng };
+    getHomeData(lat, lng).then(data => applyHomeData(data, lat, lng)).catch(() => {});
   };
 
   // Manual pull-to-refresh: force re-fetch from API using last known coords
@@ -2518,7 +2636,13 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
 
   return (
     <ThemeContext.Provider value={{ colors: themeColors, dark: darkMode, setDark: setDarkMode, onLogout }}>
-    {selectedStore ? (
+    {!userLocation ? (
+      <LocationGateView
+        locLoading={locLoading}
+        onUseMyLocation={startLocationWatch}
+        onLocationPicked={handleLocationPicked}
+      />
+    ) : selectedStore ? (
       <StoreDetailsPage store={selectedStore} onBack={() => setSelectedStore(null)} />
     ) : bannerStorePicker ? (
       <LinkedStoresPage
@@ -3132,6 +3256,104 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   notServiceableBtnText: { color: '#fff', fontSize: 13, fontFamily: 'Nunito_700Bold' },
+
+  /* Location gate — blocks Home until a location is chosen */
+  locGateContainer: {
+    flex: 1,
+    backgroundColor: '#f7f7fb',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  locGateCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 28,
+    alignItems: 'center',
+    shadowColor: '#1a1a2e',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
+    elevation: 3,
+  },
+  locGateEmoji: { fontSize: 40, marginBottom: 12 },
+  locGateTitle: {
+    fontSize: 20,
+    fontFamily: 'Nunito_800ExtraBold',
+    color: '#14141a',
+    textAlign: 'center',
+  },
+  locGateSubtitle: {
+    fontSize: 14,
+    fontFamily: 'Nunito_400Regular',
+    color: '#8b8b96',
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  locGatePrimaryBtn: {
+    width: '100%',
+    borderRadius: 16,
+    backgroundColor: '#7b2fcd',
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 22,
+    shadowColor: '#7b2fcd',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  locGatePrimaryText: { color: '#ffffff', fontSize: 16, fontFamily: 'Nunito_700Bold' },
+  locGateSecondaryBtn: { marginTop: 16, paddingVertical: 6 },
+  locGateSecondaryText: { color: '#7b2fcd', fontSize: 14, fontFamily: 'Nunito_700Bold' },
+
+  /* Location picker — fixed center-pin map */
+  locPickerContainer: { flex: 1, backgroundColor: '#000' },
+  locPickerMap: { flex: 1 },
+  locPickerPinWrap: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -18,
+    marginTop: -36,
+  },
+  locPickerPinEmoji: { fontSize: 36 },
+  locPickerBackBtn: {
+    position: 'absolute',
+    top: 54,
+    left: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  locPickerBackText: { fontSize: 14, fontFamily: 'Nunito_700Bold', color: '#14141a' },
+  locPickerBottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    paddingBottom: 34,
+  },
+  locPickerHint: {
+    fontSize: 13,
+    fontFamily: 'Nunito_600SemiBold',
+    color: '#8b8b96',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  locPickerConfirmBtn: {
+    borderRadius: 16,
+    backgroundColor: '#7b2fcd',
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  locPickerConfirmBtnDisabled: { backgroundColor: '#d8d8e2' },
+  locPickerConfirmText: { color: '#ffffff', fontSize: 16, fontFamily: 'Nunito_700Bold' },
 
   /* Full-page navigation views */
   fullPageWrap: { flex: 1 },

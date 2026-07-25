@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "offer",
+    "name": "Topdelz",
     "slug": "offer",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -22,11 +22,24 @@
           "locationWhenInUsePermission": "Allow Topdelz to use your location to show nearby stores and deals."
         }
       ],
-      "expo-video"
+      "expo-video",
+      "expo-dev-client",
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
+      "./plugins/withFirebaseModularHeadersFix.js"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.offer",
+      "bundleIdentifier": "com.topdelz.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Allow Topdelz to use your location to show nearby stores and deals.",
         "NSAppTransportSecurity": {
@@ -52,10 +65,21 @@
         "backgroundImage": "./assets/topdelz-background.png",
         "monochromeImage": "./assets/topdelz-monochrome.png"
       },
-      "package": "com.anonymous.offer"
+      "package": "com.topdelz.app",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/topdelz-favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "590641c8-d056-42b3-a718-dbbc278f184d"
+      }
+    },
+    "owner": "mcaharan11"
   }
 }

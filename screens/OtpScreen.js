@@ -14,7 +14,8 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { sendOtp, verifyOtp } from '../services/api';
+import auth from '@react-native-firebase/auth';
+import { firebaseLogin } from '../services/api';
 
 function haptic() { Vibration.vibrate(8); }
 
@@ -44,6 +45,7 @@ export default function OtpScreen({ mobileNumber, allowSkip, onVerified, onSkip 
   const [canResend, setCanResend] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [confirmation, setConfirmation] = useState(null);
 
   useEffect(() => {
     if (resendTimer <= 0) { setCanResend(true); return; }
@@ -76,7 +78,13 @@ export default function OtpScreen({ mobileNumber, allowSkip, onVerified, onSkip 
     setLoading(true);
     setError('');
     try {
-      const data = await verifyOtp(mobileNumber, otp.join(''));
+      if (!confirmation) {
+        setError('Please send the OTP first.');
+        return;
+      }
+      const credential = await confirmation.confirm(otp.join(''));
+      const idToken = await credential.user.getIdToken();
+      const data = await firebaseLogin(idToken);
       if (data.success) {
         await AsyncStorage.setItem('auth_token', data.token);
         await AsyncStorage.setItem('user', JSON.stringify(data.user));
@@ -85,30 +93,37 @@ export default function OtpScreen({ mobileNumber, allowSkip, onVerified, onSkip 
         setError(data.message || 'Invalid OTP.');
       }
     } catch (err) {
-      const msg = err?.response?.data?.message || 'Verification failed. Try again.';
+      const msg = err?.code === 'auth/invalid-verification-code'
+        ? 'Incorrect code. Please try again.'
+        : (err?.response?.data?.message || 'Verification failed. Try again.');
       setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleResend = async () => {
-    if (!canResend) return;
-    haptic();
+  const sendOtp = async () => {
     setError('');
     try {
-      const data = await sendOtp(mobileNumber);
-      if (data.success) {
-        setSent(true);
-        setResendTimer(30);
-        setCanResend(false);
-      } else {
-        Alert.alert('Error', data.message || 'Failed to send OTP.');
-      }
+      const conf = await auth().signInWithPhoneNumber('+91' + mobileNumber);
+      setConfirmation(conf);
+      setSent(true);
+      setResendTimer(30);
+      setCanResend(false);
     } catch (err) {
-      const msg = err?.response?.data?.message || 'Failed to send OTP.';
-      Alert.alert('Error', msg);
+      Alert.alert('Error', err?.message || 'Failed to send OTP.');
     }
+  };
+
+  useEffect(() => {
+    if (mobileNumber) { sendOtp(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleResend = () => {
+    if (!canResend) return;
+    haptic();
+    sendOtp();
   };
 
   return (
@@ -167,11 +182,11 @@ export default function OtpScreen({ mobileNumber, allowSkip, onVerified, onSkip 
 
           <Pressable
             style={styles.resendWrap}
-            disabled={!canResend}
+            disabled={!sent || !canResend}
             onPress={handleResend}
           >
             {!sent ? (
-              <Text style={[styles.resendText, styles.resendTextActive]}>Send OTP</Text>
+              <Text style={styles.resendText}>Sending OTP...</Text>
             ) : canResend ? (
               <Text style={[styles.resendText, styles.resendTextActive]}>Resend OTP</Text>
             ) : (

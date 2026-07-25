@@ -33,26 +33,26 @@ api.interceptors.request.use(async (config) => {
 /* ─── Auth endpoints ─────────────────────────────────────── */
 
 /**
- * Log in (or create) a user by mobile number alone, without OTP.
- * @param {string} mobile  10-digit mobile number
+ * Exchange a verified Firebase phone-auth ID token for an app auth token.
+ * @param {string} idToken
  */
-export const loginWithMobile = (mobile) =>
-  api.post('/login', { mobile }).then((r) => r.data);
+export const firebaseLogin = (idToken) =>
+  api.post('/auth/firebase-login', { id_token: idToken }).then((r) => r.data);
 
 /**
- * Request an OTP for the given mobile number.
- * @param {string} mobile  10-digit mobile number
+ * Create an account with email + password.
  */
-export const sendOtp = (mobile) =>
-  api.post('/send-otp', { mobile }).then((r) => r.data);
+export const registerWithEmail = (name, email, password) =>
+  api.post('/auth/register', { name, email, password }).then((r) => r.data);
 
 /**
- * Verify the OTP and receive an auth token.
- * @param {string} mobile
- * @param {string} otp     6-digit code
+ * Log in with email + password.
  */
-export const verifyOtp = (mobile, otp) =>
-  api.post('/verify-otp', { mobile, otp }).then((r) => r.data);
+export const loginWithEmail = (email, password) =>
+  api.post('/auth/login', { email, password }).then((r) => r.data);
+
+export const logout = () =>
+  api.post('/auth/logout').then((r) => r.data);
 
 export const getProfile = () =>
   api.get('/profile').then((r) => r.data);

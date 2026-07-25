@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "885067960703",
+    "project_id": "topdelz-9c124",
+    "storage_bucket": "topdelz-9c124.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:885067960703:android:939a12d10e1edd85ccca4a",
+        "android_client_info": {
+          "package_name": "com.topdelz.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDzfCZOOrSfBPpQ5aqxe6oGCmpCkHyKfIM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

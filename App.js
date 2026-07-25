@@ -277,6 +277,7 @@ const sk = StyleSheet.create({
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getProfile } from './services/api';
 import LoginScreen from './screens/LoginScreen';
+import EmailAuthScreen from './screens/EmailAuthScreen';
 import PermissionsScreen from './screens/PermissionsScreen';
 import OtpScreen from './screens/OtpScreen';
 import UserTypeScreen from './screens/UserTypeScreen';
@@ -320,6 +321,7 @@ function FadeScreen({ children, slideFrom = 'bottom' }) {
 export default function App() {
   const [splashDone, setSplashDone] = useState(false);
   const [showLoginScreen, setShowLoginScreen] = useState(false);
+  const [showEmailAuthScreen, setShowEmailAuthScreen] = useState(false);
   const [showPermissionsScreen, setShowPermissionsScreen] = useState(false);
   const [showOtpScreen, setShowOtpScreen] = useState(false);
   const [showUserTypeScreen, setShowUserTypeScreen] = useState(false);
@@ -332,6 +334,7 @@ export default function App() {
 
   const navigateTo = (screen) => {
     setShowLoginScreen(false);
+    setShowEmailAuthScreen(false);
     setShowPermissionsScreen(false);
     setShowOtpScreen(false);
     setShowUserTypeScreen(false);
@@ -339,6 +342,7 @@ export default function App() {
     setShowHomeScreen(false);
 
     if (screen === 'login') setShowLoginScreen(true);
+    if (screen === 'emailAuth') setShowEmailAuthScreen(true);
     if (screen === 'permissions') setShowPermissionsScreen(true);
     if (screen === 'otp') setShowOtpScreen(true);
     if (screen === 'userType') setShowUserTypeScreen(true);
@@ -407,6 +411,11 @@ export default function App() {
         return true;
       }
 
+      if (showEmailAuthScreen) {
+        navigateTo('login');
+        return true;
+      }
+
       if (showHomeScreen || showLoginScreen) {
         if (now - lastBackPressRef.current < 2000) {
           BackHandler.exitApp();
@@ -426,6 +435,7 @@ export default function App() {
     splashDone,
     showHomeScreen,
     showLoginScreen,
+    showEmailAuthScreen,
     showPermissionsScreen,
     showOtpScreen,
     showUserTypeScreen,
@@ -520,15 +530,34 @@ export default function App() {
     );
   }
 
+  if (showEmailAuthScreen) {
+    return (
+      <FadeScreen slideFrom="bottom">
+        <EmailAuthScreen
+          onAuthed={(authedUser) => {
+            setUser(authedUser);
+            setReverifyMode(false);
+            if (authedUser?.user_type && authedUser?.interests_count > 0) {
+              navigateTo('home');
+            } else {
+              navigateTo('userType');
+            }
+          }}
+          onPhoneTab={() => navigateTo('login')}
+        />
+      </FadeScreen>
+    );
+  }
+
   return (
     <FadeScreen slideFrom="bottom">
       <LoginScreen
-        onLoggedIn={(mobile, loggedInUser) => {
+        onPhoneSubmit={(mobile) => {
           setMobileNumber(mobile);
-          setUser(loggedInUser);
           setReverifyMode(false);
           navigateTo('permissions');
         }}
+        onEmailTab={() => navigateTo('emailAuth')}
         onGuestLogin={() => navigateTo('home')}
       />
     </FadeScreen>
