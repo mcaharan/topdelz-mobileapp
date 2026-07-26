@@ -74,9 +74,6 @@ export const getHomeData = (lat, lng) => {
   return api.get('/home-data', { params }).then((r) => r.data);
 };
 
-export const viewStory = (storyId, viewerId) =>
-  api.post(`/stories/${storyId}/view`, { viewer_id: viewerId }).then((r) => r.data);
-
 export const getWishlist = () =>
   api.get('/wishlist').then((r) => r.data);
 

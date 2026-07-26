@@ -2,7 +2,6 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import MapView, { Marker, Callout, PROVIDER_DEFAULT } from 'react-native-maps';
 import {
   ActivityIndicator,
@@ -11,7 +10,6 @@ import {
   Dimensions,
   Image,
   Modal,
-  PanResponder,
   Pressable,
   ScrollView,
   RefreshControl,
@@ -25,13 +23,10 @@ import {
   Linking,
 } from 'react-native';
 import * as Location from 'expo-location';
-import { addToWishlist, getHomeData, getProfile, getWishlist, getWishlistHistory, removeFromWishlist, trackOfferEvent, updateProfile, viewStory } from '../services/api';
+import { addToWishlist, getHomeData, getProfile, getWishlist, getWishlistHistory, removeFromWishlist, trackOfferEvent, updateProfile } from '../services/api';
 
 const { width, height } = Dimensions.get('window');
 const haptic = () => Vibration.vibrate(8);
-const STORY_DURATION_MS = 30000;
-const STORY_SEEN_IDS_KEY = 'story_seen_ids_v1';
-const STORY_VIEWER_ID_KEY = 'story_viewer_id_v1';
 
 const shareItem = (title, message) => {
   haptic();
@@ -66,8 +61,6 @@ const THEMES = {
     sheetSubText: '#555555', sheetDivider: '#f0f0f0', sheetDealBorder: '#f5f5f5',
     statsRow: '#ffffff', statNum: '#7b2fcd', menuCard: '#ffffff',
     menuLabel: '#111111', menuSub: '#999999', menuBorder: '#f5f5f5',
-    mealSection: '#ffffff', mealTitle: '#111111',
-    mealTagBg: '#fafafa', mealTagBorder: '#dddddd', mealTagText: '#555555',
   },
   dark: {
     bg: '#0f0f18', card: '#1c1c2a', text: '#f0f0f0', subtext: '#aaaaaa',
@@ -79,8 +72,6 @@ const THEMES = {
     sheetSubText: '#aaaaaa', sheetDivider: '#2a2a3a', sheetDealBorder: '#2a2a3a',
     statsRow: '#1c1c2a', statNum: '#a78bfa', menuCard: '#1c1c2a',
     menuLabel: '#f0f0f0', menuSub: '#888888', menuBorder: '#2a2a3a',
-    mealSection: '#1c1c2a', mealTitle: '#f0f0f0',
-    mealTagBg: '#252535', mealTagBorder: '#3a3a50', mealTagText: '#bbbbbb',
   },
 };
 
@@ -98,38 +89,6 @@ const CATEGORIES = [
   { id: 'night',   emoji: '🌙',  label: 'Nightlife',        color: '#ede7f6' },
   { id: 'online',  emoji: '🛒',  label: 'Online\nBrands',   color: '#e0f7fa' },
   { id: 'travel',  emoji: '🧳',  label: 'Travel',           color: '#fff8e1' },
-];
-
-const BANNERS = [
-  { id: '1', title: '60% + Flat ₹100 off', sub: 'On your next 5 deliveries', badge: '🏠 Home Delivery', colors: ['#1d3fad', '#0d47a1'], emojis: ['🍔', '🍟', '🥤'] },
-  { id: '2', title: 'Buy 1 Get 1 Free',    sub: 'On all salon services today', badge: '💄 Beauty Deals',  colors: ['#7b2fcd', '#c03b8f'], emojis: ['💅', '💇', '🧖'] },
-  { id: '3', title: 'Up to 50% off',       sub: 'Local restaurants near you',  badge: '🍛 Dine-Out',      colors: ['#e65100', '#f57c00'], emojis: ['🍛', '🍜', '🍱'] },
-];
-
-const FLASH_DEALS = [
-  { id: '1', name: 'Burger King',   off: '40%', emoji: '🍔', bg: ['#ff6f00', '#f57c00'] },
-  { id: '2', name: 'Pizza Hut',     off: '30%', emoji: '🍕', bg: ['#c62828', '#e53935'] },
-  { id: '3', name: 'KFC',           off: '25%', emoji: '🍗', bg: ['#827717', '#f9a825'] },
-  { id: '4', name: 'Baskin Robbins',off: '20%', emoji: '🍦', bg: ['#ad1457', '#e91e63'] },
-];
-
-const DEALS = [
-  { id: '1', title: 'Entertainment', desc: 'Save up to 25%', color: ['#e8574a', '#f7a134'], emoji: '🎬' },
-  { id: '2', title: 'Electronics',   desc: 'Save up to 40%', color: ['#2563eb', '#7b2fcd'], emoji: '📱' },
-  { id: '3', title: 'Dining Out',    desc: 'Save up to 30%', color: ['#059669', '#0d9488'], emoji: '🍕' },
-  { id: '4', title: 'Beauty Deals',  desc: 'Save up to 35%', color: ['#c03b8f', '#7b2fcd'], emoji: '💅' },
-];
-
-const MEAL_TAGS = [
-  { id: 'all',    label: 'All' },
-  { id: 'brk',   label: 'Breakfast' },
-  { id: 'lnch',  label: 'Lunch' },
-  { id: 'si',    label: 'South Indian' },
-  { id: 'ch',    label: 'Chinese' },
-  { id: 'din',   label: 'Dinner' },
-  { id: 'bir',   label: 'Biryani' },
-  { id: 'rol',   label: 'Rolls' },
-  { id: 'swt',   label: 'Sweets' },
 ];
 
 const POPULAR_STORES = [
@@ -234,25 +193,6 @@ const NEARBY_STORES = [
   },
 ];
 
-/* ─── Countdown hook ────────────────────────────────────── */
-function useCountdown(endHour = 23, endMin = 59) {
-  const calc = () => {
-    const now = new Date();
-    const end = new Date(); end.setHours(endHour, endMin, 59, 0);
-    const diff = Math.max(0, Math.floor((end - now) / 1000));
-    const h = String(Math.floor(diff / 3600)).padStart(2, '0');
-    const m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
-    const s = String(diff % 60).padStart(2, '0');
-    return `${h}:${m}:${s}`;
-  };
-  const [time, setTime] = useState(calc);
-  useEffect(() => {
-    const t = setInterval(() => setTime(calc()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  return time;
-}
-
 /* ─── Sub-components ────────────────────────────────────── */
 function CategoryItem({ item, active, onPress }) {
   return (
@@ -287,534 +227,6 @@ function SectionHeader({ title, subtitle, accent }) {
   );
 }
 
-function BannerSlider({ banners = [], onOpenStore, onOpenMultipleStores }) {
-  const [index, setIndex] = useState(0);
-  const scrollRef = useRef(null);
-
-  useEffect(() => {
-    if (banners.length === 0) return;
-    const t = setInterval(() => {
-      const next = (index + 1) % banners.length;
-      scrollRef.current?.scrollTo({ x: next * (width - 28), animated: true });
-      setIndex(next);
-    }, 3500);
-    return () => clearInterval(t);
-  }, [index, banners.length]);
-
-  return (
-    <View>
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={(e) =>
-          setIndex(Math.round(e.nativeEvent.contentOffset.x / (width - 28)))
-        }
-        contentContainerStyle={{ gap: 0 }}
-        style={{ marginHorizontal: 14 }}
-      >
-        {banners.map((b) => (
-          <View
-            key={b.id}
-            style={[styles.heroBanner, { backgroundColor: (b.colors && b.colors[0]) || '#7b2fcd' }]}
-          >
-            <View style={{ flex: 1 }}>
-              <View style={styles.heroBadge}>
-                <Text style={styles.heroBadgeText}>{b.badge}</Text>
-              </View>
-              <Text style={styles.heroOffer}>{b.title}</Text>
-              <Text style={styles.heroSub}>{b.sub}</Text>
-              {b.cta_enabled && (
-                <Pressable
-                  style={styles.heroBtn}
-                  onPress={() => {
-                    const linked = b.linked_stores || [];
-                    if (linked.length === 1) {
-                      onOpenStore?.(linked[0], 'banner-direct');
-                    } else if (linked.length > 1) {
-                      onOpenMultipleStores?.(b);
-                    }
-                  }}
-                >
-                  <Text style={styles.heroBtnText}>{b.cta_text || 'Order now →'}</Text>
-                </Pressable>
-              )}
-              <Text style={styles.heroFine}>{b.fine_print || '*Valid on orders above ₹200'}</Text>
-            </View>
-            <View style={styles.heroEmojisCol}>
-              {b.image_url ? (
-                <Image source={{ uri: b.image_url }} style={styles.heroImage} resizeMode="cover" />
-              ) : (
-                (b.emojis || []).map((e, i) => (
-                  <Text key={i} style={{ fontSize: i === 0 ? 42 : 34 }}>{e}</Text>
-                ))
-              )}
-            </View>
-          </View>
-        ))}
-      </ScrollView>
-      {/* Dots */}
-      <View style={styles.dotsRow}>
-        {banners.map((_, i) => (
-          <View key={i} style={[styles.dot, i === index && styles.dotActive]} />
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function FlashDealCard({ item, countdown, isSaved, onToggleWishlist, onOpen }) {
-  return (
-    <View style={[styles.flashCard, { backgroundColor: (item.bg && item.bg[0]) || '#7b2fcd' }]}>
-      <Pressable style={styles.quickSaveBtn} onPress={() => onToggleWishlist?.('flash_deal', item)}>
-        <Text style={styles.quickSaveText}>{isSaved ? '♥' : '♡'}</Text>
-      </Pressable>
-      {item.image_url ? (
-        <Image source={{ uri: item.image_url }} style={styles.flashImage} resizeMode="cover" />
-      ) : (
-        <Text style={styles.flashEmoji}>{item.emoji}</Text>
-      )}
-      <Text style={styles.flashOff}>{item.off} OFF</Text>
-      <Text style={styles.flashName}>{item.name}</Text>
-      <View style={styles.flashTimerRow}>
-        <Text style={styles.flashTimerIcon}>⏱</Text>
-        <Text style={styles.flashTimer}>{countdown}</Text>
-      </View>
-      <Pressable style={styles.flashViewBtn} onPress={() => onOpen?.(item)}>
-        <Text style={styles.flashViewText}>View Deal</Text>
-      </Pressable>
-      <Pressable
-        style={styles.flashShareBtn}
-        onPress={() => shareItem(
-          `${item.name} Flash Deal`,
-          `⚡️ ${item.off} OFF at ${item.name}! Ends in ${countdown}.\nGet it on Topdelz 🎉`
-        )}
-      >
-        <Text style={styles.flashShareText}>📤 Share</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-/* ─── StoryRow ───────────────────────────────────────────── */
-function StoryRow({ stories = [], onStoryPress, seenStoryIds = {} }) {
-  if (!stories || !stories.length) return null;
-  return (
-    <View style={{ paddingVertical: 10, backgroundColor: 'transparent' }}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 14, gap: 14 }}
-      >
-        {stories.map((story) => {
-          const seen = !!seenStoryIds[String(story.id)];
-          return (<Pressable
-            key={String(story.id)}
-            onPress={() => {
-              haptic();
-              onStoryPress?.(story);
-            }}
-            style={{ alignItems: 'center', gap: 5 }}
-          >
-            <View
-              style={{
-                width: 64, height: 64, borderRadius: 32,
-                padding: 3, alignItems: 'center', justifyContent: 'center',
-                backgroundColor: seen ? '#d1d5db' : '#7b2fcd',
-              }}
-            >
-              <View style={{
-                width: 58, height: 58, borderRadius: 29,
-                backgroundColor: story.bg_color || '#7b2fcd',
-                overflow: 'hidden', alignItems: 'center', justifyContent: 'center',
-                borderWidth: 2, borderColor: '#fff',
-              }}>
-                {story.image_url ? (
-                  <Image
-                    source={{ uri: story.image_url }}
-                    style={{ width: 58, height: 58 }}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <Text style={{ fontSize: 24 }}>{story.emoji || '⭐'}</Text>
-                )}
-              </View>
-            </View>
-            <Text
-              style={{
-                fontSize: 11, fontFamily: 'Nunito_600SemiBold',
-                color: '#333', textAlign: 'center', maxWidth: 68,
-              }}
-              numberOfLines={1}
-            >
-              {story.title}
-            </Text>
-          </Pressable>);
-        })}
-      </ScrollView>
-    </View>
-  );
-}
-
-const StoryViewer = React.memo(function StoryViewer({ visible, storiesList, index, onClose, viewerId, seenStoryIds, onSetStorySeen }) {
-  const [currentIndex, setCurrentIndex] = useState(index || 0);
-  const [viewCount, setViewCount] = useState(null);
-  const [isPaused, setIsPaused] = useState(false);
-  const [progressMs, setProgressMs] = useState(0);
-  const translateX = useRef(new Animated.Value(0)).current;
-  const contentOpacity = useRef(new Animated.Value(1)).current;
-  const storyCountsRef = useRef({});
-  const remainingDurationRef = useRef(STORY_DURATION_MS);
-  const longPressTimeoutRef = useRef(null);
-  const holdTriggeredRef = useRef(false);
-  const seenStoryIdsRef = useRef(seenStoryIds || {});
-
-  useEffect(() => {
-    seenStoryIdsRef.current = seenStoryIds || {};
-  }, [seenStoryIds]);
-
-  useEffect(() => {
-    if (!storiesList?.length) {
-      setCurrentIndex(0);
-      return;
-    }
-    const targetId = index;
-    const foundIndex = storiesList.findIndex((item) => String(item.id) === String(targetId));
-    setCurrentIndex(foundIndex >= 0 ? foundIndex : 0);
-  }, [index, storiesList]);
-
-  useEffect(() => {
-    if (visible) {
-      storyCountsRef.current = {};
-      remainingDurationRef.current = STORY_DURATION_MS;
-      setProgressMs(0);
-      setIsPaused(false);
-      holdTriggeredRef.current = false;
-    } else {
-      setProgressMs(0);
-      contentOpacity.setValue(1);
-    }
-  }, [contentOpacity, visible]);
-
-  const goPrev = useCallback(() => {
-    setCurrentIndex((i) => (i > 0 ? i - 1 : i));
-  }, []);
-
-  const goNext = useCallback(() => {
-    const totalStories = storiesList?.length || 0;
-    if (currentIndex + 1 >= totalStories) {
-      setIsPaused(false);
-      setProgressMs(0);
-      onClose?.();
-      return;
-    }
-    setCurrentIndex((i) => i + 1);
-  }, [currentIndex, onClose, storiesList]);
-
-  const pauseStory = useCallback(() => {
-    if (isPaused) return;
-    setIsPaused(true);
-    holdTriggeredRef.current = true;
-    remainingDurationRef.current = Math.max(0, (storiesList?.[currentIndex]?.duration_seconds ?? 30) * 1000 - progressMs);
-  }, [currentIndex, isPaused, progressMs, storiesList]);
-
-  const resumeStory = useCallback(() => {
-    if (!isPaused) return;
-    setIsPaused(false);
-  }, [isPaused]);
-
-  useEffect(() => {
-    if (!visible) return undefined;
-
-    const story = storiesList?.[currentIndex];
-    let mounted = true;
-    if (story && story.media_url) {
-      const storyId = String(story.id);
-      setViewCount(storyCountsRef.current[storyId] ?? story.total_views ?? 0);
-      Image.prefetch(story.media_url).catch(() => {});
-      const next = storiesList?.[currentIndex + 1];
-      const prev = storiesList?.[currentIndex - 1];
-      if (next && next.media_url) Image.prefetch(next.media_url).catch(() => {});
-      if (prev && prev.media_url) Image.prefetch(prev.media_url).catch(() => {});
-
-      if (!seenStoryIdsRef.current[storyId] && viewerId) {
-        viewStory(story.id, viewerId).then((res) => {
-          if (!mounted) return;
-          if (res && res.data && typeof res.data.views !== 'undefined') {
-            storyCountsRef.current[storyId] = res.data.views;
-            setViewCount(res.data.views);
-            onSetStorySeen?.(storyId, true);
-          }
-        }).catch(() => {});
-      }
-
-      const durationMs = Math.max(1000, Number(story.duration_seconds || 30) * 1000);
-      remainingDurationRef.current = durationMs;
-      setProgressMs(0);
-      setIsPaused(false);
-      contentOpacity.setValue(0.82);
-      Animated.timing(contentOpacity, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: true,
-      }).start();
-    }
-
-    return () => {
-      mounted = false;
-    };
-  }, [contentOpacity, currentIndex, onSetStorySeen, storiesList, viewerId, visible]);
-
-  useEffect(() => {
-    if (!visible || isPaused) {
-      return undefined;
-    }
-    const story = storiesList?.[currentIndex];
-    if (!story) {
-      return undefined;
-    }
-
-    const durationMs = Math.max(1000, Number(story.duration_seconds || 30) * 1000);
-    const tickMs = 100;
-    const intervalId = setInterval(() => {
-      setProgressMs((prev) => Math.min(durationMs, prev + tickMs));
-    }, tickMs);
-
-    return () => clearInterval(intervalId);
-  }, [currentIndex, goNext, isPaused, storiesList, visible]);
-
-  useEffect(() => {
-    if (!visible || isPaused) {
-      return;
-    }
-
-    const story = storiesList?.[currentIndex];
-    if (!story) {
-      return;
-    }
-
-    const durationMs = Math.max(1000, Number(story.duration_seconds || 30) * 1000);
-    if (progressMs >= durationMs) {
-      goNext();
-    }
-  }, [currentIndex, goNext, isPaused, progressMs, storiesList, visible]);
-
-  const pan = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 6,
-    onPanResponderGrant: () => {
-      holdTriggeredRef.current = false;
-      longPressTimeoutRef.current = setTimeout(() => {
-        pauseStory();
-      }, 220);
-    },
-    onPanResponderMove: (_, gesture) => {
-      if (Math.abs(gesture.dx) > 6 && longPressTimeoutRef.current) {
-        clearTimeout(longPressTimeoutRef.current);
-        longPressTimeoutRef.current = null;
-      }
-      if (holdTriggeredRef.current) {
-        return;
-      }
-      translateX.setValue(gesture.dx);
-    },
-    onPanResponderRelease: (_, gesture) => {
-      if (longPressTimeoutRef.current) {
-        clearTimeout(longPressTimeoutRef.current);
-        longPressTimeoutRef.current = null;
-      }
-      if (holdTriggeredRef.current) {
-        holdTriggeredRef.current = false;
-        resumeStory();
-        Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-        return;
-      }
-      if (isPaused) {
-        resumeStory();
-      }
-      const dx = gesture.dx;
-      const threshold = width * 0.18;
-      if (dx > threshold && currentIndex > 0) {
-        Animated.timing(translateX, { toValue: width, duration: 180, useNativeDriver: true }).start(() => {
-          translateX.setValue(0);
-          goPrev();
-        });
-      } else if (dx < -threshold && currentIndex + 1 < (storiesList?.length || 0)) {
-        Animated.timing(translateX, { toValue: -width, duration: 180, useNativeDriver: true }).start(() => {
-          translateX.setValue(0);
-          goNext();
-        });
-      } else {
-        Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-      }
-    },
-    onPanResponderTerminate: () => {
-      if (longPressTimeoutRef.current) {
-        clearTimeout(longPressTimeoutRef.current);
-        longPressTimeoutRef.current = null;
-      }
-      if (holdTriggeredRef.current) {
-        holdTriggeredRef.current = false;
-      }
-      if (isPaused) {
-        resumeStory();
-      }
-      Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-    },
-  })).current;
-
-  const onShare = async () => {
-    const story = storiesList?.[currentIndex];
-    if (!story) return;
-    try {
-      await Share.share({ message: story.title ? `${story.title}\n${story.media_url}` : story.media_url, url: story.media_url });
-    } catch (_) {}
-  };
-
-  const toggleSeen = useCallback(() => {
-    const story = storiesList?.[currentIndex];
-    if (!story) return;
-    const storyId = String(story.id);
-    onSetStorySeen?.(storyId, !seenStoryIdsRef.current[storyId]);
-  }, [currentIndex, onSetStorySeen, storiesList]);
-
-  const story = storiesList?.[currentIndex] ?? null;
-  const progressWidth = `${Math.max(0, Math.min(100, ((progressMs / Math.max(1000, Number(story?.duration_seconds || 30) * 1000)) * 100)))}%`;
-  const contentScale = translateX.interpolate({
-    inputRange: [-width, 0, width],
-    outputRange: [0.94, 1, 0.94],
-    extrapolate: 'clamp',
-  });
-  const slideOpacity = translateX.interpolate({
-    inputRange: [-width, 0, width],
-    outputRange: [0.72, 1, 0.72],
-    extrapolate: 'clamp',
-  });
-
-  const videoPlayer = useVideoPlayer(story?.media_type === 'video' ? story.media_url : null, (player) => {
-    player.loop = true;
-  });
-
-  useEffect(() => {
-    if (!videoPlayer) return;
-    if (!visible || !story || story.media_type !== 'video' || isPaused) {
-      videoPlayer.pause();
-      return;
-    }
-    videoPlayer.play();
-  }, [isPaused, story, videoPlayer, visible]);
-
-  return (
-    <Modal visible={!!visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.98)', alignItems: 'center', justifyContent: 'center' }}>
-        <Animated.View
-          {...pan.panHandlers}
-          style={{
-            transform: [{ translateX }, { scale: contentScale }],
-            opacity: Animated.multiply(contentOpacity, slideOpacity),
-            width: width,
-            alignItems: 'center',
-            justifyContent: 'center',
-            flex: 1,
-          }}
-        >
-          <View style={{ width: width, height: height * 0.78, alignItems: 'center', justifyContent: 'center' }}>
-            {story ? (
-              story.media_type === 'video' ? (
-                <VideoView
-                  player={videoPlayer}
-                  style={{ width: width, height: height * 0.78 }}
-                  contentFit="contain"
-                  nativeControls={false}
-                />
-              ) : (
-                <Image
-                  source={{ uri: story.media_url, cache: 'force-cache' }}
-                  style={{ width: width, height: height * 0.78 }}
-                  resizeMode="contain"
-                  fadeDuration={0}
-                />
-              )
-            ) : null}
-          </View>
-        </Animated.View>
-
-        <Pressable
-          onPress={goPrev}
-          delayLongPress={220}
-          onLongPress={pauseStory}
-          onPressOut={() => {
-            if (holdTriggeredRef.current || isPaused) {
-              holdTriggeredRef.current = false;
-              resumeStory();
-            }
-          }}
-          style={{ position: 'absolute', left: 0, top: 120, bottom: 120, width: width * 0.28 }}
-        />
-        <Pressable
-          onPress={goNext}
-          delayLongPress={220}
-          onLongPress={pauseStory}
-          onPressOut={() => {
-            if (holdTriggeredRef.current || isPaused) {
-              holdTriggeredRef.current = false;
-              resumeStory();
-            }
-          }}
-          style={{ position: 'absolute', right: 0, top: 120, bottom: 120, width: width * 0.28 }}
-        />
-
-        <View style={{ position: 'absolute', top: 44, left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ color: '#fff', fontSize: 16, flex: 1 }}>{story?.title ?? ''}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {isPaused ? <Text style={{ color: '#fff', opacity: 0.8, marginRight: 10 }}>Paused</Text> : null}
-            <Text style={{ color: '#fff', opacity: 0.9, marginRight: 12 }}>{story?.duration_seconds || 30}s</Text>
-            <Pressable onPress={onClose} style={{ padding: 8, marginLeft: 8 }}>
-              <Ionicons name="close-circle-outline" size={24} color="#fff" />
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={{ position: 'absolute', top: 90, left: 16, right: 16, height: 5, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-          {(storiesList || []).map((_, i) => {
-            if (i < currentIndex) {
-              return <View key={String(i)} style={{ flex: 1, height: 5, marginHorizontal: 2, backgroundColor: '#fff', borderRadius: 999 }} />;
-            }
-
-            if (i > currentIndex) {
-              return <View key={String(i)} style={{ flex: 1, height: 5, marginHorizontal: 2, backgroundColor: '#ffffff33', borderRadius: 999 }} />;
-            }
-
-            return (
-              <View key={String(i)} style={{ flex: 1, height: 5, marginHorizontal: 2, backgroundColor: '#ffffff33', borderRadius: 999, overflow: 'hidden' }}>
-                  <View style={{ width: progressWidth, height: 5, backgroundColor: '#fff', borderRadius: 999 }} />
-              </View>
-            );
-          })}
-        </View>
-
-        <View style={{ position: 'absolute', bottom: 34, left: 20, right: 20, alignItems: 'center', gap: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: 'rgba(17,17,17,0.55)', borderRadius: 18 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="eye-outline" size={18} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 13 }}>{viewCount ?? story?.total_views ?? 0}</Text>
-            </View>
-            <Text style={{ color: '#fff', opacity: 0.85 }}>{String(currentIndex + 1)} / {storiesList?.length || 0}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Pressable onPress={toggleSeen} style={{ paddingVertical: 4, paddingHorizontal: 10, backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 999 }}>
-                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{seenStoryIdsRef.current[String(story?.id)] ? 'Mark Unviewed' : 'Mark Viewed'}</Text>
-              </Pressable>
-              <Pressable onPress={onShare} style={{ padding: 6 }}>
-                <Ionicons name="share-social-outline" size={20} color="#fff" />
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-});
 
 function SpecialOfferStrip() {
   return (
@@ -829,98 +241,6 @@ function SpecialOfferStrip() {
       </View>
       <Text style={{ fontSize: 56 }}>🛵</Text>
     </View>
-  );
-}
-
-function DealCard({ deal, isSaved, onToggleWishlist, onOpen }) {
-  return (
-    <View style={[styles.dealCard, { backgroundColor: (deal.color && deal.color[0]) || '#7b2fcd' }]}>
-      <Pressable style={styles.quickSaveBtn} onPress={() => onToggleWishlist?.('deal_card', deal)}>
-        <Text style={styles.quickSaveText}>{isSaved ? '♥' : '♡'}</Text>
-      </Pressable>
-      {deal.image_url ? (
-        <Image source={{ uri: deal.image_url }} style={styles.dealImage} resizeMode="cover" />
-      ) : (
-        <Text style={styles.dealEmoji}>{deal.emoji}</Text>
-      )}
-      <Text style={styles.dealSubLabel}>A guide to</Text>
-      <Text style={styles.dealTitle}>{deal.title}</Text>
-      <Text style={styles.dealDesc}>{deal.desc}</Text>
-      <View style={styles.dealBtnRow}>
-        <Pressable style={styles.exploreBtn} onPress={() => onOpen?.(deal)}>
-          <Text style={styles.exploreBtnText}>Explore now</Text>
-        </Pressable>
-        <Pressable
-          style={styles.dealShareBtn}
-          onPress={() => shareItem(
-            `${deal.title} Deal`,
-            `${deal.emoji} ${deal.desc} on ${deal.title}!\nCheck it out on Topdelz 🎉`
-          )}
-        >
-          <Text style={styles.dealShareText}>📤</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-function PopularCard({ store, onPress, isSaved, onToggleWishlist }) {
-  const { colors } = useContext(ThemeContext);
-  return (
-    <Pressable style={[styles.popularCard, { backgroundColor: colors.card }]} onPress={onPress}>
-      <View style={[styles.popularImgBox, { backgroundColor: store.bg }]}>
-        <Pressable style={styles.quickSaveBtnSmall} onPress={() => onToggleWishlist?.('store', store)}>
-          <Text style={styles.quickSaveTextSmall}>{isSaved ? '♥' : '♡'}</Text>
-        </Pressable>
-        <Text style={styles.popularEmoji}>{store.emoji}</Text>
-        {!store.open && (
-          <View style={styles.closedOverlay}><Text style={styles.closedText}>Closed</Text></View>
-        )}
-      </View>
-      <View style={styles.popularInfo}>
-        <Text style={[styles.popularName, { color: colors.text }]} numberOfLines={1}>{store.name}</Text>
-        <View style={styles.ratingRow}>
-          <Text style={styles.starIcon}>⭐</Text>
-          <Text style={[styles.ratingVal, { color: colors.text }]}>{store.rating}</Text>
-          <Text style={styles.popularDot}>·</Text>
-          <Text style={styles.popularDist}>{store.dist}</Text>
-        </View>
-        <View style={[styles.tagPill, store.open ? styles.tagOpen : styles.tagClosed]}>
-          <Text style={[styles.tagPillText, { color: store.open ? '#15803d' : '#991b1b' }]}>
-            {store.tag}
-          </Text>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-function NearbyCard({ store, onPress, isSaved, onToggleWishlist }) {
-  const { colors } = useContext(ThemeContext);
-  return (
-    <Pressable style={[styles.nearbyCard, { backgroundColor: colors.card }]} onPress={onPress}>
-      <View style={[styles.nearbyImgBox, { backgroundColor: store.bg }]}>
-        <Pressable style={styles.quickSaveBtnSmall} onPress={() => onToggleWishlist?.('store', store)}>
-          <Text style={styles.quickSaveTextSmall}>{isSaved ? '♥' : '♡'}</Text>
-        </Pressable>
-        <Text style={styles.nearbyEmoji}>{store.emoji}</Text>
-        {!store.open && (
-          <View style={styles.nearbyClosedBadge}>
-            <Text style={styles.nearbyClosedText}>Closed</Text>
-          </View>
-        )}
-        <View style={styles.nearbyRatingBadge}>
-          <Text style={styles.nearbyRatingText}>⭐ {store.rating}</Text>
-        </View>
-      </View>
-      <View style={styles.nearbyInfo}>
-        <Text style={[styles.nearbyName, { color: colors.text }]} numberOfLines={1}>{store.name}</Text>
-        <Text style={styles.nearbyDist} numberOfLines={1}>{store.dist} · {store.area}</Text>
-        <View style={styles.nearbyTagPill}>
-          <Text style={styles.nearbyTag}>{store.tag}</Text>
-        </View>
-      </View>
-    </Pressable>
   );
 }
 
@@ -1940,13 +1260,6 @@ const WALKTHROUGH_STEPS = [
     tipTop: 190,
   },
   {
-    icon: '⚡',
-    title: 'Flash Deals',
-    body: 'These expire soon — grab them before the timer hits zero!',
-    arrowDir: 'down',
-    tipTop: 340,
-  },
-  {
     icon: '🏪',
     title: 'Tap Any Store',
     body: 'Store cards open a deal sheet with today\'s best offers inside.',
@@ -2158,14 +1471,12 @@ function LocationGateView({ locLoading, onUseMyLocation, onLocationPicked }) {
 export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
   const [activeTab, setActiveTab] = useState('home');
   const [activeCategory, setActiveCategory] = useState('dine');
-  const [activeMealTag, setActiveMealTag] = useState('all');
   const [searchText, setSearchText] = useState('');
   const [selectedStore, setSelectedStore] = useState(null);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showWalkthrough, setShowWalkthrough] = useState(false);  // Default to false
   const [darkMode, setDarkMode] = useState(false);
   const themeColors = darkMode ? THEMES.dark : THEMES.light;
-  const countdown = useCountdown(23, 59);
 
   // ── Check if user already saw walkthrough on first mount ──
   useEffect(() => {
@@ -2182,14 +1493,9 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
   const [locLoading, setLocLoading]     = useState(false);
   const watcherRef      = useRef(null);   // Location.watchPositionAsync subscription
   const lastLatLngRef   = useRef(null);   // last coords sent to API (avoid redundant calls)
-  const [banners, setBanners]           = useState([]);
-  const [flashDeals, setFlashDeals]     = useState([]);
-  const [dealCards, setDealCards]       = useState([]);
   const [trendingItems, setTrendingItems] = useState([]);
   const [popularStores, setPopularStores] = useState([]);
   const [nearbyStores, setNearbyStores]   = useState([]);
-  const [stories, setStories]             = useState([]);
-  const [sectionsConfig, setSectionsConfig] = useState([]);
   const [interestMatchedStores, setInterestMatchedStores] = useState([]);
   const [serviceability, setServiceability] = useState({ in_service_area: true, service_area_name: 'Pondicherry', areas: [] });
   const serviceabilityAlertShownRef = useRef(false);
@@ -2198,54 +1504,6 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
   const [wishlistItems, setWishlistItems] = useState([]);
   const [wishlistHistory, setWishlistHistory] = useState([]);
   const [wishlistMap, setWishlistMap] = useState({});
-  const [seenStoryIds, setSeenStoryIds] = useState({});
-  const [storyViewerId, setStoryViewerId] = useState(null);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const [storedSeenIds, storedViewerId] = await Promise.all([
-          AsyncStorage.getItem(STORY_SEEN_IDS_KEY),
-          AsyncStorage.getItem(STORY_VIEWER_ID_KEY),
-        ]);
-
-        if (storedSeenIds) {
-          const parsed = JSON.parse(storedSeenIds);
-          if (Array.isArray(parsed)) {
-            const next = {};
-            parsed.forEach((id) => {
-              next[String(id)] = true;
-            });
-            setSeenStoryIds(next);
-          }
-        }
-
-        if (storedViewerId) {
-          setStoryViewerId(storedViewerId);
-        } else {
-          const generatedViewerId = `viewer_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-          await AsyncStorage.setItem(STORY_VIEWER_ID_KEY, generatedViewerId);
-          setStoryViewerId(generatedViewerId);
-        }
-      } catch (_) {
-        // keep story state non-blocking in offline/storage failure cases
-      }
-    })();
-  }, []);
-
-  const setStorySeen = useCallback((storyId, seen) => {
-    const normalizedId = String(storyId);
-    setSeenStoryIds((prev) => {
-      const next = { ...prev };
-      if (seen) {
-        next[normalizedId] = true;
-      } else {
-        delete next[normalizedId];
-      }
-      AsyncStorage.setItem(STORY_SEEN_IDS_KEY, JSON.stringify(Object.keys(next))).catch(() => {});
-      return next;
-    });
-  }, []);
 
   const normalizeWishlistItems = useCallback((rows = []) => {
     return rows.map((row) => {
@@ -2333,18 +1591,6 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
     });
   }, [logOfferEvent]);
 
-  const isStoriesVisible = sectionsConfig.length === 0
-    ? true
-    : sectionsConfig.find((s) => s.key === 'stories')?.visible !== false;
-
-  const [storyModalVisible, setStoryModalVisible] = useState(false);
-  const [storyModalStoryId, setStoryModalStoryId] = useState(null);
-  const [storyViewerStories, setStoryViewerStories] = useState([]);
-  const closeStoryViewer = useCallback(() => {
-    setStoryModalVisible(false);
-    setStoryViewerStories([]);
-  }, []);
-
   const allStoresForLinks = Array.from(
     new Map(
       [...popularStores, ...nearbyStores, ...interestMatchedStores]
@@ -2352,43 +1598,6 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
         .map((s) => [String(s.id), s])
     ).values()
   );
-
-  const openStory = useCallback((story) => {
-    if (!story) return;
-    if (story.media_url) {
-      if (story.media_type === 'image') {
-        const snapshot = stories.map((s) => ({ ...s }));
-        setStoryViewerStories(snapshot);
-        setStoryModalStoryId(String(story.id));
-        setStoryModalVisible(true);
-        return;
-      }
-      if (story.media_type === 'video') {
-        const snapshot = stories.map((s) => ({ ...s }));
-        setStoryViewerStories(snapshot);
-        setStoryModalStoryId(String(story.id));
-        setStoryModalVisible(true);
-        return;
-      }
-    }
-    if (story.link_type === 'store' && story.link_id != null) {
-      const linked = allStoresForLinks.find((s) => String(s.id) === String(story.link_id));
-      if (linked) {
-        openStore(linked, 'story-store');
-      }
-      return;
-    }
-
-    if (story.link_type === 'banner' && story.link_id != null) {
-      const banner = banners.find((b) => String(b.id) === String(story.link_id));
-      if (!banner) return;
-      if ((banner.linked_stores || []).length === 1) {
-        openStore(banner.linked_stores[0], 'story-banner');
-      } else if ((banner.linked_stores || []).length > 1) {
-        setBannerStorePicker(banner);
-      }
-    }
-  }, [allStoresForLinks, banners, openStore]);
 
   const applyHomeData = (data, lat, lng) => {
     const incomingServiceability = data?.serviceability || {};
@@ -2447,36 +1656,6 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
       };
     };
 
-    if (Array.isArray(data.banners)) {
-      setBanners(data.banners.map((b) => ({
-        id: String(b.id),
-        title: b.title,
-        sub: b.sub,
-        badge: b.badge,
-        image_url: b.image_url || null,
-        cta_enabled: !!b.cta_enabled,
-        cta_text: b.cta_text || 'Order now →',
-        fine_print: b.fine_print || '*Valid on orders above ₹200',
-        colors: [b.color_start, b.color_end],
-        emojis: [b.emoji_1, b.emoji_2, b.emoji_3].filter(Boolean),
-        linked_stores: (b.linked_stores || []).map((s, idx) => normalize(s, idx)).filter((s) => s.name),
-      })));
-    } else {
-      setBanners([]);
-    }
-
-    if (data.flash_deals?.length) {
-      setFlashDeals(data.flash_deals.map(d => ({ id: String(d.id), name: d.name, off: d.off_text, emoji: d.emoji, image_url: d.image_url || null, bg: [d.bg_start, d.bg_end] })));
-    } else {
-      setFlashDeals([]);
-    }
-
-    if (data.deal_cards?.length) {
-      setDealCards(data.deal_cards.map(c => ({ id: String(c.id), title: c.title, desc: c.description, emoji: c.emoji, image_url: c.image_url || null, color: [c.color_start, c.color_end] })));
-    } else {
-      setDealCards([]);
-    }
-
     if (data.trending_items?.length) {
       setTrendingItems(data.trending_items.map(t => ({
         id: String(t.id),
@@ -2514,17 +1693,6 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
     } else {
       setPopularStores([]);
       setNearbyStores([]);
-    }
-
-    if (Array.isArray(data.stories)) {
-      setStories(data.stories.filter(s => s.is_active !== false));
-    } else {
-      setStories([]);
-    }
-    if (Array.isArray(data.sections_config)) {
-      setSectionsConfig(data.sections_config);
-    } else {
-      setSectionsConfig([]);
     }
   };
 
@@ -2755,16 +1923,6 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
           />
         }
       >
-        {/* Story media viewer modal */}
-        <StoryViewer
-          visible={storyModalVisible}
-          storiesList={storyViewerStories}
-          index={storyModalStoryId}
-          onClose={closeStoryViewer}
-          viewerId={storyViewerId}
-          seenStoryIds={seenStoryIds}
-          onSetStorySeen={setStorySeen}
-        />
         {showNotServiceable ? (
           <View style={styles.notServiceableCard}>
             <Text style={styles.notServiceableEmoji}>📍</Text>
@@ -2788,9 +1946,6 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
           </View>
         ) : (
           <>
-        {/* Stories Row */}
-        {isStoriesVisible && <StoryRow stories={stories} onStoryPress={openStory} seenStoryIds={seenStoryIds} />}
-
         {/* Greeting Strip */}
         <View style={styles.greetingStrip}>
           <View>
@@ -2819,375 +1974,7 @@ export default function HomeScreen({ onLogout, phoneVerified, onVerifyPhone }) {
           </ScrollView>
         </View>
 
-        {/* Dynamic Sections — order controlled from Home Layout admin */}
-        {(() => {
-          const DEFAULT_KEYS = ['banners', 'flash_deals', 'deal_cards', 'popular_stores', 'nearby_stores'];
-          const uniqueStorePool = Array.from(
-            new Map(
-              [...popularStores, ...nearbyStores, ...interestMatchedStores]
-                .filter((s) => s?.id != null)
-                .map((s) => [String(s.id), s])
-            ).values()
-          );
-
-          const customSections = sectionsConfig
-            .filter((s) => s?.type === 'custom' && s?.visible !== false);
-
-          const cfgByKey = Object.fromEntries((sectionsConfig || []).map((s) => [s.key, s]));
-          const getSectionHeading = (key, fallbackTitle, fallbackSubtitle = null) => {
-            const cfg = cfgByKey[key] || {};
-            const title = String(cfg.label || fallbackTitle || '').trim() || fallbackTitle;
-            const subtitle = cfg.subtitle == null || String(cfg.subtitle).trim() === ''
-              ? fallbackSubtitle
-              : String(cfg.subtitle);
-            return { title, subtitle };
-          };
-
-          const matchesCustomSection = (store, section) => {
-            const by = String(section?.filter?.by || '').toLowerCase();
-            const needle = String(section?.filter?.value || '').trim().toLowerCase();
-            if (!needle) return false;
-            if (by === 'category') return String(store?.category || '').toLowerCase().includes(needle);
-            if (by === 'tag') return String(store?.tag || '').toLowerCase().includes(needle);
-            if (by === 'interest') return (store?.interests || []).some((i) => String(i).toLowerCase().includes(needle));
-            return false;
-          };
-
-          const renderCustomSection = (section) => {
-            if (section?.mode === 'link') {
-              const targetType = String(section?.link?.target_type || 'store');
-              const ids = Array.isArray(section?.link?.target_ids)
-                ? section.link.target_ids.map((id) => String(id))
-                : [];
-              if (!ids.length) return null;
-
-              if (targetType === 'store') {
-                const linkedStores = uniqueStorePool.filter((s) => ids.includes(String(s.id)));
-                if (!linkedStores.length) return null;
-                return (
-                  <React.Fragment key={section.key}>
-                    <SectionHeader
-                      title={section.label || 'Custom Stores'}
-                      subtitle={section.subtitle || `Linked stores (${linkedStores.length})`}
-                      accent
-                    />
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ paddingHorizontal: 14, gap: 14, paddingBottom: 4 }}>
-                      {linkedStores.map((s) => (
-                        <PopularCard
-                          key={`${section.key}-${s.id}`}
-                          store={s}
-                          onPress={() => openStore(s, `custom-link-${section.key}`)}
-                          isSaved={!!wishlistMap[`store:${s.id}`]}
-                          onToggleWishlist={toggleWishlist}
-                        />
-                      ))}
-                    </ScrollView>
-                  </React.Fragment>
-                );
-              }
-
-              if (targetType === 'banner') {
-                const linkedBanners = banners.filter((b) => ids.includes(String(b.id)));
-                if (!linkedBanners.length) return null;
-                return (
-                  <React.Fragment key={section.key}>
-                    <SectionHeader
-                      title={section.label || 'Custom Banner Section'}
-                      subtitle={section.subtitle || null}
-                      accent
-                    />
-                    <BannerSlider
-                      banners={linkedBanners}
-                      onOpenStore={(store) => openStore(store, `custom-banner-${section.key}`)}
-                      onOpenMultipleStores={(banner) => setBannerStorePicker(banner)}
-                    />
-                  </React.Fragment>
-                );
-              }
-
-              if (targetType === 'story') {
-                const linkedStories = (stories || []).filter((st) => ids.includes(String(st.id)));
-                if (!linkedStories.length) return null;
-                return (
-                  <React.Fragment key={section.key}>
-                    <SectionHeader
-                      title={section.label || 'Custom Stories'}
-                      subtitle={section.subtitle || null}
-                      accent
-                    />
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ paddingHorizontal: 14, gap: 14, paddingBottom: 4 }}>
-                      {linkedStories.map((st) => (
-                        <Pressable key={`custom-story-${st.id}`} onPress={() => openStory(st)} style={{ alignItems: 'center' }}>
-                          <View style={{ width: 64, height: 64, borderRadius: 32, overflow: 'hidden', backgroundColor: st.bg_color || '#7b2fcd', justifyContent: 'center', alignItems: 'center' }}>
-                            {st.image_url ? (
-                              <Image source={{ uri: st.image_url }} style={{ width: 64, height: 64 }} resizeMode="cover" />
-                            ) : (
-                              <Text style={{ fontSize: 24 }}>{st.emoji || '⭐'}</Text>
-                            )}
-                          </View>
-                          <Text style={{ fontSize: 11, marginTop: 6 }}>{st.title}</Text>
-                        </Pressable>
-                      ))}
-                    </ScrollView>
-                  </React.Fragment>
-                );
-              }
-
-              if (targetType === 'flash_deal') {
-                const linkedFlashDeals = flashDeals.filter((d) => ids.includes(String(d.id)));
-                if (!linkedFlashDeals.length) return null;
-                return (
-                  <React.Fragment key={section.key}>
-                    <SectionHeader
-                      title={section.label || 'Custom Flash Deals'}
-                      subtitle={section.subtitle || `Ends in ${countdown}`}
-                      accent
-                    />
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ paddingHorizontal: 14, gap: 12, paddingBottom: 4 }}>
-                      {linkedFlashDeals.map((item) => (
-                        <FlashDealCard
-                          key={`${section.key}-${item.id}`}
-                          item={item}
-                          countdown={countdown}
-                          isSaved={!!wishlistMap[`flash_deal:${item.id}`]}
-                          onToggleWishlist={toggleWishlist}
-                          onOpen={(deal) => {
-                            haptic();
-                            logOfferEvent('flash_deal', Number(deal.id), 'viewed', { source: `custom-flash-${section.key}` });
-                          }}
-                        />
-                      ))}
-                    </ScrollView>
-                  </React.Fragment>
-                );
-              }
-
-              if (targetType === 'deal_card') {
-                const linkedCards = dealCards.filter((d) => ids.includes(String(d.id)));
-                if (!linkedCards.length) return null;
-                return (
-                  <React.Fragment key={section.key}>
-                    <SectionHeader
-                      title={section.label || 'Custom Deal Cards'}
-                      subtitle={section.subtitle || null}
-                      accent
-                    />
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ paddingHorizontal: 14, gap: 12, paddingBottom: 4 }}>
-                      {linkedCards.map((deal) => (
-                        <DealCard
-                          key={`${section.key}-${deal.id}`}
-                          deal={deal}
-                          isSaved={!!wishlistMap[`deal_card:${deal.id}`]}
-                          onToggleWishlist={toggleWishlist}
-                          onOpen={(card) => {
-                            haptic();
-                            logOfferEvent('deal_card', Number(card.id), 'viewed', { source: `custom-card-${section.key}` });
-                          }}
-                        />
-                      ))}
-                    </ScrollView>
-                  </React.Fragment>
-                );
-              }
-
-              return null;
-            }
-
-            const filtered = uniqueStorePool.filter((s) => matchesCustomSection(s, section));
-            if (!filtered.length) return null;
-            return (
-              <React.Fragment key={section.key}>
-                <SectionHeader
-                  title={section.label || 'Custom Stores'}
-                  subtitle={section.subtitle || `Filtered by ${section?.filter?.by || 'rule'}`}
-                  accent
-                />
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingHorizontal: 14, gap: 14, paddingBottom: 4 }}>
-                  {filtered.map((s) => (
-                    <PopularCard
-                      key={`${section.key}-${s.id}`}
-                      store={s}
-                      onPress={() => openStore(s, `custom-${section.key}`)}
-                      isSaved={!!wishlistMap[`store:${s.id}`]}
-                      onToggleWishlist={toggleWishlist}
-                    />
-                  ))}
-                </ScrollView>
-              </React.Fragment>
-            );
-          };
-
-          const orderedKeys = sectionsConfig.length > 0
-            ? sectionsConfig
-                .filter(s => s.visible !== false && s.key !== 'stories')
-                .sort((a, b) => a.order - b.order)
-                .map(s => s.key)
-            : DEFAULT_KEYS;
-
-          const sectionMap = {
-            banners: (
-              <React.Fragment key="banners">
-                {banners.length > 0 && (
-                  <>
-                    {(() => {
-                      const heading = getSectionHeading('banners', 'Deal of the Day', 'Based on your Interest');
-                      return <SectionHeader title={heading.title} subtitle={heading.subtitle} accent />;
-                    })()}
-                    <BannerSlider
-                      banners={banners}
-                      onOpenStore={(store) => openStore(store, 'banner-direct')}
-                      onOpenMultipleStores={(banner) => setBannerStorePicker(banner)}
-                    />
-                  </>
-                )}
-                <SpecialOfferStrip />
-              </React.Fragment>
-            ),
-            flash_deals: flashDeals.length > 0 ? (
-              <React.Fragment key="flash_deals">
-                {(() => {
-                  const heading = getSectionHeading('flash_deals', '⚡ Flash Deals', `Ends in ${countdown}`);
-                  return <SectionHeader title={heading.title} subtitle={heading.subtitle} accent />;
-                })()}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingHorizontal: 14, gap: 12, paddingBottom: 4 }}>
-                  {flashDeals.map((item) => (
-                    <FlashDealCard
-                      key={item.id}
-                      item={item}
-                      countdown={countdown}
-                      isSaved={!!wishlistMap[`flash_deal:${item.id}`]}
-                      onToggleWishlist={toggleWishlist}
-                      onOpen={(deal) => {
-                        haptic();
-                        logOfferEvent('flash_deal', Number(deal.id), 'viewed', { source: 'home-flash' });
-                      }}
-                    />
-                  ))}
-                </ScrollView>
-              </React.Fragment>
-            ) : null,
-            deal_cards: (
-              <React.Fragment key="deal_cards">
-                {dealCards.length > 0 && (
-                  <>
-                    {(() => {
-                      const heading = getSectionHeading('deal_cards', 'Featured Deals', 'Offers You Will Love');
-                      return <SectionHeader title={heading.title} subtitle={heading.subtitle} accent />;
-                    })()}
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ paddingHorizontal: 14, gap: 12, paddingBottom: 4 }}>
-                      {dealCards.map((deal) => (
-                        <DealCard
-                          key={deal.id}
-                          deal={deal}
-                          isSaved={!!wishlistMap[`deal_card:${deal.id}`]}
-                          onToggleWishlist={toggleWishlist}
-                          onOpen={(card) => {
-                            haptic();
-                            logOfferEvent('deal_card', Number(card.id), 'viewed', { source: 'home-featured' });
-                          }}
-                        />
-                      ))}
-                    </ScrollView>
-                  </>
-                )}
-                {interestMatchedStores.length > 0 && (
-                  <>
-                    <SectionHeader title="Based on Your Interests" subtitle="Stores matching your preferences" accent />
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ paddingHorizontal: 14, gap: 14, paddingBottom: 4 }}>
-                      {interestMatchedStores.map((s) => (
-                        <PopularCard
-                          key={`interest-${s.id}`}
-                          store={s}
-                          onPress={() => openStore(s, 'interest-matched')}
-                          isSaved={!!wishlistMap[`store:${s.id}`]}
-                          onToggleWishlist={toggleWishlist}
-                        />
-                      ))}
-                    </ScrollView>
-                  </>
-                )}
-                <View style={[styles.moreDealsSection, { backgroundColor: themeColors.mealSection }]}>
-                  <Text style={[styles.moreDealsTitle, { color: themeColors.mealTitle }]}>Need more deals on Monday?</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ gap: 8 }}>
-                    {MEAL_TAGS.map((t) => (
-                      <Pressable
-                        key={t.id}
-                        onPress={() => setActiveMealTag(t.id)}
-                        style={[
-                          styles.mealTag,
-                          { backgroundColor: themeColors.mealTagBg, borderColor: themeColors.mealTagBorder },
-                          activeMealTag === t.id && styles.mealTagActive,
-                        ]}
-                      >
-                        <Text style={[
-                          styles.mealTagText,
-                          { color: themeColors.mealTagText },
-                          activeMealTag === t.id && styles.mealTagTextActive,
-                        ]}>
-                          {t.label}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                </View>
-              </React.Fragment>
-            ),
-            popular_stores: popularStores.length > 0 ? (
-              <React.Fragment key="popular_stores">
-                {(() => {
-                  const heading = getSectionHeading('popular_stores', 'Popular in City', 'Top rated stores near you');
-                  return <SectionHeader title={heading.title} subtitle={heading.subtitle} accent />;
-                })()}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingHorizontal: 14, gap: 14, paddingBottom: 4 }}>
-                  {popularStores.map((s) => (
-                    <PopularCard
-                      key={s.id}
-                      store={s}
-                      onPress={() => openStore(s, 'popular')}
-                      isSaved={!!wishlistMap[`store:${s.id}`]}
-                      onToggleWishlist={toggleWishlist}
-                    />
-                  ))}
-                </ScrollView>
-              </React.Fragment>
-            ) : null,
-            nearby_stores: nearbyStores.length > 0 ? (
-              <React.Fragment key="nearby_stores">
-                {(() => {
-                  const heading = getSectionHeading('nearby_stores', 'Close to you', 'Within 5 Km');
-                  return <SectionHeader title={heading.title} subtitle={heading.subtitle} accent />;
-                })()}
-                <View style={styles.nearbyGrid}>
-                  {nearbyStores.map((s) => (
-                    <NearbyCard
-                      key={s.id}
-                      store={s}
-                      onPress={() => openStore(s, 'nearby')}
-                      isSaved={!!wishlistMap[`store:${s.id}`]}
-                      onToggleWishlist={toggleWishlist}
-                    />
-                  ))}
-                </View>
-              </React.Fragment>
-            ) : null,
-          };
-
-          customSections.forEach((section) => {
-            sectionMap[section.key] = renderCustomSection(section);
-          });
-
-          return orderedKeys.map(key => sectionMap[key] ?? null);
-        })()}
+        <SpecialOfferStrip />
 
         {/* Footer */}
         <View style={styles.footerWrap}>
@@ -3523,203 +2310,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 6,
   },
 
-  /* Hero Banner */
-  heroBanner: {
-    width: width - 28,
-    borderRadius: 22,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 180,
-  },
-  heroBadge: {
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    alignSelf: 'flex-start', borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 4, marginBottom: 10,
-  },
-  heroBadgeText: { fontSize: 11, fontFamily: 'Nunito_600SemiBold', color: '#ffffff' },
-  heroOffer: { fontSize: 23, fontFamily: 'Nunito_800ExtraBold', color: '#ffffff', lineHeight: 28, marginBottom: 4 },
-  heroSub: { fontSize: 12, fontFamily: 'Nunito_400Regular', color: 'rgba(255,255,255,0.85)', marginBottom: 12 },
-  heroBtn: {
-    backgroundColor: '#ffffff', alignSelf: 'flex-start',
-    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, marginBottom: 6,
-  },
-  heroBtnText: { fontSize: 13, fontFamily: 'Nunito_700Bold', color: '#1a1060' },
-  heroFine: { fontSize: 10, fontFamily: 'Nunito_400Regular', color: 'rgba(255,255,255,0.6)' },
-  bannerStoreOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    justifyContent: 'center',
-    padding: 18,
-  },
-  bannerStoreSheet: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  bannerStoreTitle: { fontSize: 18, color: '#111827', fontFamily: 'Nunito_800ExtraBold' },
-  bannerStoreSub: { fontSize: 13, color: '#64748b', marginTop: 2, fontFamily: 'Nunito_600SemiBold' },
-  bannerStoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#eef2ff',
-    padding: 10,
-    backgroundColor: '#f8fafc',
-  },
-  bannerStoreEmojiWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bannerStoreName: { color: '#0f172a', fontSize: 14, fontFamily: 'Nunito_700Bold' },
-  bannerStoreMeta: { color: '#94a3b8', fontSize: 12, marginTop: 2, fontFamily: 'Nunito_600SemiBold' },
-  bannerStoreArrow: { color: '#6366f1', fontSize: 22, fontFamily: 'Nunito_800ExtraBold' },
-  bannerStoreClose: {
-    marginTop: 12,
-    alignSelf: 'flex-end',
-    backgroundColor: '#111827',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-  },
-  bannerStoreCloseText: { color: '#fff', fontSize: 13, fontFamily: 'Nunito_700Bold' },
-  heroEmojisCol: { alignItems: 'center', gap: 2, marginLeft: 10 },
-  dotsRow: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#dddddd' },
-  dotActive: { width: 18, backgroundColor: '#7b2fcd' },
-
-  /* Flash deals */
-  flashCard: {
-    width: 160, borderRadius: 20, padding: 16,
-    alignItems: 'flex-start', gap: 4,
-  },
-  flashEmoji: { fontSize: 34, marginBottom: 4 },
-  flashOff: { fontSize: 22, fontFamily: 'Nunito_800ExtraBold', color: '#ffffff' },
-  flashName: { fontSize: 13, fontFamily: 'Nunito_600SemiBold', color: 'rgba(255,255,255,0.9)' },
-  flashTimerRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
-  flashTimerIcon: { fontSize: 11 },
-  flashTimer: { fontSize: 12, fontFamily: 'Nunito_700Bold', color: '#ffffff' },
-  flashViewBtn: {
-    marginTop: 8, backgroundColor: 'rgba(255,255,255,0.22)',
-    borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
-    paddingHorizontal: 12, paddingVertical: 7, alignSelf: 'flex-start',
-  },
-  flashViewText: { fontSize: 12, fontFamily: 'Nunito_700Bold', color: '#ffffff' },
-
-  /* Featured deal cards */
-  dealCard: { width: 155, borderRadius: 16, padding: 16, justifyContent: 'space-between', minHeight: 175 },
-  dealEmoji: { fontSize: 32, marginBottom: 6 },
-  dealSubLabel: { fontSize: 11, fontFamily: 'Nunito_400Regular', color: 'rgba(255,255,255,0.8)' },
-  dealTitle: { fontSize: 17, fontFamily: 'Nunito_800ExtraBold', color: '#ffffff', marginBottom: 3 },
-  dealDesc: { fontSize: 12, fontFamily: 'Nunito_600SemiBold', color: 'rgba(255,255,255,0.9)', marginBottom: 10 },
-  exploreBtn: {
-    backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start',
-  },
-  exploreBtnText: { fontSize: 12, fontFamily: 'Nunito_700Bold', color: '#ffffff' },
-
-  /* More Deals / meal tags */
-  moreDealsSection: {
-    marginHorizontal: 14, marginTop: 20,
-    backgroundColor: '#ffffff', borderRadius: 16, padding: 16,
-    shadowColor: '#1a1a2e', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
-    gap: 12,
-  },
-  moreDealsTitle: { fontSize: 16, fontFamily: 'Nunito_800ExtraBold', color: '#111111' },
-  mealTag: {
-    borderWidth: 1.5, borderColor: '#ddd', borderRadius: 20,
-    paddingHorizontal: 14, paddingVertical: 7, backgroundColor: '#fafafa',
-  },
-  mealTagActive: { borderColor: '#7b2fcd', backgroundColor: '#f3e8ff' },
-  mealTagText: { fontSize: 13, fontFamily: 'Nunito_600SemiBold', color: '#555555' },
-  mealTagTextActive: { color: '#7b2fcd', fontFamily: 'Nunito_700Bold' },
-
-  /* Popular in City */
-  popularCard: {
-    width: 156, backgroundColor: '#ffffff', borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#1a1a2e', shadowOpacity: 0.09, shadowRadius: 10, elevation: 4,
-  },
-  popularImgBox: { width: '100%', height: 110, justifyContent: 'center', alignItems: 'center' },
-  popularEmoji: { fontSize: 44 },
-  closedOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center',
-  },
-  closedText: { fontSize: 13, fontFamily: 'Nunito_700Bold', color: '#ffffff' },
-  popularInfo: { padding: 10 },
-  popularName: { fontSize: 14, fontFamily: 'Nunito_700Bold', color: '#111111', marginBottom: 4 },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 6 },
-  starIcon: { fontSize: 11 },
-  ratingVal: { fontSize: 12, fontFamily: 'Nunito_700Bold', color: '#111111' },
-  popularDot: { fontSize: 12, color: '#aaaaaa' },
-  popularDist: { fontSize: 11, fontFamily: 'Nunito_400Regular', color: '#888888' },
-  tagPill: { alignSelf: 'flex-start', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
-  tagOpen: { backgroundColor: '#dcfce7' },
-  tagClosed: { backgroundColor: '#fee2e2' },
-  tagPillText: { fontSize: 10, fontFamily: 'Nunito_700Bold' },
-
-  /* Close to You */
-  nearbyGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 14,
-    gap: 12,
-    marginBottom: 4,
-  },
-  nearbyCard: {
-    width: (width - 40) / 2,
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#1a1a2e',
-    shadowOpacity: 0.09,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  nearbyImgBox: {
-    width: '100%',
-    height: 112,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  nearbyEmoji: { fontSize: 46 },
-  nearbyClosedBadge: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  nearbyClosedText: { fontSize: 14, fontFamily: 'Nunito_700Bold', color: '#ffffff' },
-  nearbyInfo: { padding: 10 },
-  nearbyName: { fontSize: 13, fontFamily: 'Nunito_700Bold', color: '#111111', marginBottom: 2 },
-  nearbyDist: { fontSize: 10, fontFamily: 'Nunito_400Regular', color: '#888888', marginBottom: 6 },
-  nearbyTagPill: {
-    backgroundColor: '#f3e8ff',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    alignSelf: 'flex-start',
-  },
-  nearbyTag: { fontSize: 11, fontFamily: 'Nunito_600SemiBold', color: '#7b2fcd' },
-  nearbyRatingBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#15803d',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-  },
-  nearbyRatingText: { fontSize: 10, fontFamily: 'Nunito_700Bold', color: '#ffffff' },
 
   /* Footer */
   footerWrap: { marginTop: 20, paddingVertical: 30, paddingHorizontal: 20, alignItems: 'center', gap: 6, backgroundColor: '#f3e8ff' },
@@ -3883,44 +2473,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   sheetShareIcon: { fontSize: 22 },
-
-  /* Flash deal share */
-  heroImage: { width: 96, height: 96, borderRadius: 14 },
-  flashImage: { width: 62, height: 62, borderRadius: 14, marginBottom: 2 },
-  dealImage: { width: 56, height: 56, borderRadius: 14, marginBottom: 8 },
-  quickSaveBtn: {
-    position: 'absolute', top: 8, right: 8,
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)',
-    alignItems: 'center', justifyContent: 'center',
-    zIndex: 5,
-  },
-  quickSaveText: { color: '#ffffff', fontSize: 14, fontFamily: 'Nunito_800ExtraBold' },
-  quickSaveBtnSmall: {
-    position: 'absolute', top: 6, right: 6,
-    width: 24, height: 24, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    alignItems: 'center', justifyContent: 'center', zIndex: 5,
-  },
-  quickSaveTextSmall: { color: '#7b2fcd', fontSize: 13, fontFamily: 'Nunito_800ExtraBold' },
-  flashShareBtn: {
-    marginTop: 8,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)',
-    paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start',
-  },
-  flashShareText: { fontSize: 11, fontFamily: 'Nunito_700Bold', color: '#ffffff' },
-
-  /* Deal card share */
-  dealBtnRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dealShareBtn: {
-    width: 32, height: 32, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
-  },
-  dealShareText: { fontSize: 16 },
 
   /* Profile View */
   profileHeader: {
